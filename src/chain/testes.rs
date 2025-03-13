@@ -4,7 +4,7 @@ use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
 use rsa::sha2::{Digest, Sha256};
 
 
-fn main(){
+pub fn test(){
     let mut rng = rand::thread_rng(); // rand@0.8
 
     let bits = 2048;
@@ -12,12 +12,19 @@ fn main(){
     let signing_key = SigningKey::<Sha256>::new(private_key);
     let verifying_key = signing_key.verifying_key();
 
+    let transaction_info = TransactionInfo::new(10.5, Utc::now());
+
     // Sign
     let data = b"hello world";
     let signature = signing_key.sign_with_rng(&mut rng, data);
     assert_ne!(signature.to_bytes().as_ref(), data.as_slice());
 
     // Verify
-    verifying_key.verify(data, &signature).expect("failed to verify");
+    let verified = verifying_key.verify(data, &signature);
+
+    match verified {
+        Ok(()) => println!("verificado com sucesso"),
+        Err(e) => println!("{e}"),
+    }
 }
 

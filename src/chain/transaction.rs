@@ -25,6 +25,10 @@ impl TransactionInfo {
         let str = self.value.to_string() + &self.date.to_string();
         HashedData::from_string(&str)
     }
+
+    pub fn to_string(&self) -> String {
+        // TODO
+    }
 }
 
 
