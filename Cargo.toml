@@ -5,3 +5,8 @@ edition = "2021"
 
 [dependencies]
 sha2 = "0.10"
+rsa = {version = "0.9.8", features = ["sha2"]}
+rand = "0.8.0"
+hex = "0.4.3"
+tiny-bip39 = "2.0.0"
+chrono = "0.4.40"

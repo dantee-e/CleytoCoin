@@ -1,6 +1,72 @@
-use super::utils::HashedData
+use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use rsa::pkcs1v15::{Signature, SigningKey, VerifyingKey};
+use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, SignerMut, Verifier};
+use rsa::sha2::{Digest, Sha256};
+use rand::rngs::ThreadRng;
+use super::utils::HashedData;
 
-struct Wallet{
-    public_key: HashedData,
-    private_key: HashedData
+
+
+pub struct WalletPK{
+    private_key: RsaPrivateKey,
+    signing_key: SigningKey<Sha256>
+}
+
+impl WalletPK {
+    pub fn sign_hashed_message(&self, message: HashedData) -> Result<rsa::pkcs1v15::Signature, rsa::Error>{
+        let mut hasher = Sha256::new();
+        hasher.update(message.get_hash());
+        let hashed_msg = hasher.finalize();
+        
+        let mut rng = rand::thread_rng();
+        let signed_hashed_message = self.signing_key.sign_with_rng(&mut rng, &hashed_msg);
+
+
+        Ok(signed_hashed_message)
+    }
+}
+
+
+pub struct Wallet{
+    rng: ThreadRng,
+    public_key: RsaPublicKey,
+    verifying_key: VerifyingKey<Sha256>
+}
+
+impl Wallet {
+    pub fn new() -> (Self, WalletPK) {
+        let mut rng = rand::thread_rng(); // rand@0.8
+        let bits = 2048;
+        let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+        let public_key = RsaPublicKey::from(&private_key);
+        let signing_key = SigningKey::<Sha256>::new(private_key.clone());
+        let verifying_key = signing_key.verifying_key();
+        
+        (Wallet{public_key, verifying_key, rng}, WalletPK{private_key, signing_key})
+    }
+
+    #[allow(unused)]
+    pub fn get_public_key(&self) -> RsaPublicKey {
+        self.public_key.clone()
+    }
+
+    pub fn verify_signature(&self, data: &[u8], signature: rsa::pkcs1v15::Signature) -> bool {
+        let verified = self.verifying_key.verify(data, &signature);
+        match verified {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
+
+    #[allow(unused)]
+    pub fn encrypt(&mut self, msg: &[u8]) -> Option<Vec<u8>> {
+        match self.public_key.encrypt(&mut self.rng, Pkcs1v15Encrypt, msg) {
+            Ok(value) => Some(value),
+            Err(e) => {
+                println!("Unable to encrypt the message using the wallet's public_key");
+                println!("Error: {}", e);
+                None
+            },
+        }
+    }
 }
