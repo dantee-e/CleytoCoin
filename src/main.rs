@@ -23,22 +23,12 @@ fn main() {
 
     println!("Signature: {signature}");
 
-    /* println!("This is the signature: {}", signed_message); */
+    
 
-    /* let verify_message = signed_message */
-
-
-    let verified = wallet1.verify_signature(&transaction_info, &signature);
-
-    match verified {
-        true => println!("Sucesso na verificacao"),
-        false => println!("Deu ruim na verificacao")
-    }
-
-    /* let mut transactions: Vec<Transaction> = Vec::new();
+    let mut transactions: Vec<Transaction> = Vec::new();
 
     let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature, 10.0);
 
     println!("Created new transaction, adding to chain...");
-    transactions.push(new_transaction); */
+    transactions.push(new_transaction);
 }

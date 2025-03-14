@@ -49,7 +49,7 @@ impl Wallet {
     
 
 
-    pub fn verify_signature(&self, data: &TransactionInfo, signature: &rsa::pkcs1v15::Signature) -> bool {
+    pub fn verify_transaction_info(&self, data: &TransactionInfo, signature: &rsa::pkcs1v15::Signature) -> bool {
         let verified = self.verifying_key.verify(data.to_string().as_bytes(), &signature);
         match verified {
             Ok(()) => {println!("Deu bom");true},

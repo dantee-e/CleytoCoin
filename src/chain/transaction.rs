@@ -42,9 +42,10 @@ pub struct Transaction {
 impl Transaction {
     pub fn new(sender: Wallet, receiver: Wallet, data: TransactionInfo, signature: Signature, ammount:f32) -> Self{
         
-        let verify_signature = true; //sender.verify_signature(data.to_string(), &signature);
+        let verify_signature = sender.verify_transaction_info(&data, &signature);
         
         if verify_signature {
+            println!("Assinatura verificada com sucesso");
             Self{
                 sender,
                 receiver,
