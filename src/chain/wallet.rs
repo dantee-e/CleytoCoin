@@ -1,14 +1,14 @@
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
-use rsa::pkcs1v15::{Signature, SigningKey, VerifyingKey};
-use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, SignerMut, Verifier};
-use rsa::sha2::{Digest, Sha256};
+use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+use rsa::signature::{Keypair, RandomizedSigner, Verifier};
+use rsa::sha2::Sha256;
 use rand::rngs::ThreadRng;
 use super::transaction::TransactionInfo;
-use super::utils::HashedData;
 
 
 
 pub struct WalletPK{
+    #[allow(unused)]
     private_key: RsaPrivateKey,
     signing_key: SigningKey<Sha256>,
     rng: ThreadRng
@@ -40,10 +40,19 @@ impl Wallet {
         let public_key = RsaPublicKey::from(&private_key);
         let signing_key = SigningKey::<Sha256>::new(private_key.clone());
         let verifying_key = signing_key.verifying_key();
-
-
         
-        (Wallet{public_key, verifying_key, rng: rng.clone()}, WalletPK{private_key, signing_key, rng})
+        (
+            Wallet{
+                public_key, 
+                verifying_key, 
+                rng: rng.clone()
+            }, 
+            WalletPK{
+                private_key, 
+                signing_key, 
+                rng
+            }
+        )
     }
 
     

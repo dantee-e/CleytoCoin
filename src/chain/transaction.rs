@@ -1,8 +1,6 @@
-use super::utils::{HashedData};
 use super::wallet::Wallet;
-use rsa::pkcs1v15::{Signature};
+use rsa::pkcs1v15::Signature;
 use chrono::{DateTime, Utc};
-use sha2::Sha256;
 
 
 
@@ -20,11 +18,6 @@ impl TransactionInfo {
             date
         }
     }
- 
-    pub fn to_hashed_data(&self) -> HashedData {
-        let str = self.value.to_string() + &self.date.to_string();
-        HashedData::from_string(&str)
-    }
 
     pub fn to_string(&self) -> String {
         self.value.to_string()+ "::" + &self.date.to_string()
@@ -33,9 +26,13 @@ impl TransactionInfo {
 
 
 pub struct Transaction {
+    #[allow(unused)]
     pub sender: Wallet,
+    #[allow(unused)]
     pub receiver: Wallet,
+    #[allow(unused)]
     pub signature: Signature,
+    #[allow(unused)]
     pub ammount: f32,
 }
 

@@ -1,6 +1,6 @@
 mod chain;
 use chain::transaction::{Transaction, TransactionInfo};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use chain::wallet::Wallet;
 
 fn main() {
@@ -12,7 +12,7 @@ fn main() {
     
 
     let (wallet1, mut wallet1_pk) = Wallet::new();
-    let (wallet2, mut wallet2_pk) = Wallet::new();
+    let (wallet2, _) = Wallet::new();
 
     let transaction_info = TransactionInfo::new(10.5, Utc::now());
 
