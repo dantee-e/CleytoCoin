@@ -4,6 +4,13 @@ use chrono::{DateTime, Utc};
 use chain::wallet::Wallet;
 
 fn main() {
+    let teste = false;
+    if teste {
+        chain::testes::test();
+        return;
+    }
+    
+
     let (wallet1, mut wallet1_pk) = Wallet::new();
     let (wallet2, mut wallet2_pk) = Wallet::new();
 
@@ -20,10 +27,11 @@ fn main() {
 
     /* let verify_message = signed_message */
 
-    let verified = wallet1.verify_signature(transaction_info.to_string(), signature);
+
+    let verified = wallet1.verify_signature(&transaction_info, &signature);
 
     match verified {
-        true => println!("Sucesso nan verificacao"),
+        true => println!("Sucesso na verificacao"),
         false => println!("Deu ruim na verificacao")
     }
 

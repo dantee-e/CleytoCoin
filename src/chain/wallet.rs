@@ -16,11 +16,9 @@ pub struct WalletPK{
 
 impl WalletPK {
     pub fn sign_transaction(&mut self, transaction_info: &TransactionInfo) -> Result<rsa::pkcs1v15::Signature, rsa::Error>{
-        let mut hasher = Sha256::new();
-        hasher.update(transaction_info.to_string());
-        let hashed_msg = hasher.finalize();
+
         
-        let signed_hashed_message = self.signing_key.sign_with_rng(&mut self.rng, &hashed_msg);
+        let signed_hashed_message = self.signing_key.sign_with_rng(&mut self.rng, transaction_info.to_string().as_bytes());
 
 
         Ok(signed_hashed_message)
@@ -48,17 +46,20 @@ impl Wallet {
         (Wallet{public_key, verifying_key, rng: rng.clone()}, WalletPK{private_key, signing_key, rng})
     }
 
-    #[allow(unused)]
-    pub fn get_public_key(&self) -> RsaPublicKey {
-        self.public_key.clone()
-    }
+    
 
-    pub fn verify_signature(&self, data: String, signature: rsa::pkcs1v15::Signature) -> bool {
-        let verified = self.verifying_key.verify(data.as_bytes(), &signature);
+
+    pub fn verify_signature(&self, data: &TransactionInfo, signature: &rsa::pkcs1v15::Signature) -> bool {
+        let verified = self.verifying_key.verify(data.to_string().as_bytes(), &signature);
         match verified {
             Ok(()) => {println!("Deu bom");true},
             Err(_) => {println!("Deu ruim");false},
         }
+    }
+
+    #[allow(unused)]
+    pub fn get_public_key(&self) -> RsaPublicKey {
+        self.public_key.clone()
     }
 
     #[allow(unused)]

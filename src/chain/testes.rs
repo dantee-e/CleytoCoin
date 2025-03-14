@@ -19,6 +19,8 @@ pub fn test(){
     let signature = signing_key.sign_with_rng(&mut rng, data);
     assert_ne!(signature.to_bytes().as_ref(), data.as_slice());
 
+    println!("signature: {signature}");
+
     // Verify
     let verified = verifying_key.verify(data, &signature);
 
