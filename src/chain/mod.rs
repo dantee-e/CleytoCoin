@@ -14,6 +14,5 @@ struct Chain {
 impl Chain {
     fn new_block(previous_hash: utils::HashedData, transactions: Vec<Transaction>, timestamp: DateTime<Utc>){
         println!("{}", previous_hash.hash_as_string());
-        
     }
 }

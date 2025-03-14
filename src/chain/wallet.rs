@@ -46,10 +46,10 @@ impl Wallet {
                 public_key, 
                 verifying_key, 
                 rng: rng.clone()
-            }, 
+            },
             WalletPK{
-                private_key, 
-                signing_key, 
+                private_key,
+                signing_key,
                 rng
             }
         )

@@ -4,13 +4,6 @@ use chrono::Utc;
 use chain::wallet::Wallet;
 
 fn main() {
-    let teste = false;
-    if teste {
-        chain::testes::test();
-        return;
-    }
-    
-
     let (wallet1, mut wallet1_pk) = Wallet::new();
     let (wallet2, _) = Wallet::new();
 
@@ -23,12 +16,10 @@ fn main() {
 
     println!("Signature: {signature}");
 
-    
-
     let mut transactions: Vec<Transaction> = Vec::new();
 
     let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature, 10.0);
 
     println!("Created new transaction, adding to chain...");
-    transactions.push(new_transaction);
+    // chain.addBlock(bloco);
 }
