@@ -2,6 +2,7 @@ use rsa::RsaPrivateKey;
 use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
 use rsa::sha2::{Digest, Sha256};
+use chrono::Utc;
 
 
 pub fn test(){
@@ -12,7 +13,6 @@ pub fn test(){
     let signing_key = SigningKey::<Sha256>::new(private_key);
     let verifying_key = signing_key.verifying_key();
 
-    let transaction_info = TransactionInfo::new(10.5, Utc::now());
 
     // Sign
     let data = b"hello world";

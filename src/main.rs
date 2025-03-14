@@ -9,7 +9,7 @@ fn main() {
 
     let transaction_info = TransactionInfo::new(10.5, Utc::now());
 
-    let signature = match wallet1_pk.sign_hashed_message(transaction_info.to_string()) {
+    let signature = match wallet1_pk.sign_transaction(&transaction_info) {
         Ok(value) => value,
         Err(e) => panic!("Error creating signed message: {e}"),
     };
@@ -20,7 +20,7 @@ fn main() {
 
     /* let verify_message = signed_message */
 
-    let verified = wallet1.verify_signature(&transaction_info.to_hashed_data().get_hash(), signature);
+    let verified = wallet1.verify_signature(transaction_info.to_string(), signature);
 
     match verified {
         true => println!("Sucesso nan verificacao"),

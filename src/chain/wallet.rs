@@ -3,6 +3,7 @@ use rsa::pkcs1v15::{Signature, SigningKey, VerifyingKey};
 use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, SignerMut, Verifier};
 use rsa::sha2::{Digest, Sha256};
 use rand::rngs::ThreadRng;
+use super::transaction::TransactionInfo;
 use super::utils::HashedData;
 
 
@@ -14,12 +15,11 @@ pub struct WalletPK{
 }
 
 impl WalletPK {
-    pub fn sign_hashed_message(&mut self, message: HashedData) -> Result<rsa::pkcs1v15::Signature, rsa::Error>{
+    pub fn sign_transaction(&mut self, transaction_info: &TransactionInfo) -> Result<rsa::pkcs1v15::Signature, rsa::Error>{
         let mut hasher = Sha256::new();
-        hasher.update(message.get_hash());
+        hasher.update(transaction_info.to_string());
         let hashed_msg = hasher.finalize();
         
-        let mut rng = rand::thread_rng();
         let signed_hashed_message = self.signing_key.sign_with_rng(&mut self.rng, &hashed_msg);
 
 
@@ -43,6 +43,7 @@ impl Wallet {
         let signing_key = SigningKey::<Sha256>::new(private_key.clone());
         let verifying_key = signing_key.verifying_key();
 
+
         
         (Wallet{public_key, verifying_key, rng: rng.clone()}, WalletPK{private_key, signing_key, rng})
     }
@@ -52,8 +53,8 @@ impl Wallet {
         self.public_key.clone()
     }
 
-    pub fn verify_signature(&self, data: &[u8], signature: rsa::pkcs1v15::Signature) -> bool {
-        let verified = self.verifying_key.verify(data, &signature);
+    pub fn verify_signature(&self, data: String, signature: rsa::pkcs1v15::Signature) -> bool {
+        let verified = self.verifying_key.verify(data.as_bytes(), &signature);
         match verified {
             Ok(()) => {println!("Deu bom");true},
             Err(_) => {println!("Deu ruim");false},
