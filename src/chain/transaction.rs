@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::wallet::Wallet;
 use rsa::pkcs1v15::Signature;
 use chrono::{DateTime, Utc};
@@ -5,7 +7,7 @@ use chrono::{DateTime, Utc};
 
 
 
-
+#[derive(Clone)]
 pub struct TransactionInfo {
     value: f32,
     date: DateTime<Utc>
@@ -20,26 +22,27 @@ impl TransactionInfo {
     }
 
     pub fn to_string(&self) -> String {
-        self.value.to_string()+ "::" + &self.date.to_string()
+        format!(
+            "VALUE::{}::TIME::{}",
+            self.value.to_string(),
+            self.date.to_string()
+        )
     }
+
 }
 
-
+#[derive(Clone)]
 pub struct Transaction {
-    #[allow(unused)]
     pub sender: Wallet,
-    #[allow(unused)]
     pub receiver: Wallet,
-    #[allow(unused)]
     pub signature: Signature,
-    #[allow(unused)]
-    pub ammount: f32,
+    pub transaction_info: TransactionInfo,
 }
 
 impl Transaction {
-    pub fn new(sender: Wallet, receiver: Wallet, data: TransactionInfo, signature: Signature, ammount:f32) -> Self{
+    pub fn new(sender: Wallet, receiver: Wallet, transaction_info: TransactionInfo, signature: Signature) -> Self{
         
-        let verify_signature = sender.verify_transaction_info(&data, &signature);
+        let verify_signature = sender.verify_transaction_info(&transaction_info, &signature);
         
         if verify_signature {
             println!("Assinatura verificada com sucesso");
@@ -47,7 +50,7 @@ impl Transaction {
                 sender,
                 receiver,
                 signature,
-                ammount
+                transaction_info
             }
         }
         /* verifying_key.; */
@@ -56,5 +59,15 @@ impl Transaction {
             panic!("Signature couldn't be verified");
         }
         
+    }
+
+    pub fn to_string(&self) -> String {
+        format!(
+            "SENDER::{}::RECEIVER::{}::{}::SIGNATURE::{}",
+            self.sender.to_string(),
+            self.receiver.to_string(),
+            self.transaction_info.to_string(),
+            self.signature.to_string()
+        )
     }
 }

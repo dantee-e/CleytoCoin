@@ -1,11 +1,13 @@
 mod chain;
-use chain::transaction::{Transaction, TransactionInfo};
+use chain::{block, transaction::{Transaction, TransactionInfo}};
 use chrono::Utc;
 use chain::wallet::Wallet;
 
 fn main() {
     let (wallet1, mut wallet1_pk) = Wallet::new();
     let (wallet2, _) = Wallet::new();
+
+    
 
     let transaction_info = TransactionInfo::new(10.5, Utc::now());
 
@@ -14,12 +16,14 @@ fn main() {
         Err(e) => panic!("Error creating signed message: {e}"),
     };
 
-    println!("Signature: {signature}");
+    let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature);
 
-    let mut transactions: Vec<Transaction> = Vec::new();
 
-    let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature, 10.0);
+    let mut chain = chain::Chain::new();
 
-    println!("Created new transaction, adding to chain...");
-    // chain.addBlock(bloco);
+    let block = block::Block::new(&mut chain, vec![new_transaction]);
+
+    chain.add_block(block);
+
+    
 }

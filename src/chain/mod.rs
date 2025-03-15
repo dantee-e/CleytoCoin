@@ -2,17 +2,52 @@ pub mod utils;
 pub mod transaction;
 pub mod block;
 pub mod wallet;
+use block::Block;
 use chrono::{DateTime, Utc};
+use sha2::Sha256;
 use transaction::Transaction as Transaction;
 
 pub mod testes;
 
-struct Chain {
+pub struct Chain {
     blocks: Vec<block::Block>
 }
 
 impl Chain {
-    fn new_block(previous_hash: utils::HashedData, transactions: Vec<Transaction>, timestamp: DateTime<Utc>){
-        println!("{}", previous_hash.hash_as_string());
+
+    pub fn new() -> Self {
+        Self{
+            blocks: Vec::new()
+        }
+    }
+
+    pub fn add_block(&mut self, block: Block){
+        self.blocks.push(block);
+    }
+
+    pub fn create_genesis_block(&mut self) -> Block {
+        let genesis = Block::genesis_block();
+        self.add_block(genesis.clone());
+        genesis
+    }
+
+    fn get_last_hash(&mut self) -> String {
+        match self.blocks.last() {
+            Some(block) => block.get_hash(),
+            None => {
+                let genesis_block = self.create_genesis_block();
+                genesis_block.get_hash()
+            },
+        }
+    }
+
+    fn get_last_index(&mut self) -> i64 {
+        match self.blocks.last() {
+            Some(block) => block.get_index(),
+            None =>{
+                let genesis_block = self.create_genesis_block();
+                genesis_block.get_index()
+            },
+        }
     }
 }
