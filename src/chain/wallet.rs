@@ -66,3 +66,15 @@ impl Wallet {
     }
 }
 // -----------------------------------------------------------------------------------------------------------------
+
+#[cfg(test)] //ensures that the tests module is only included when running tests.
+mod tests {
+    use super::Wallet;
+
+    #[test] //mark a function as a test.
+    fn test_wallet_creation() {
+        let (wallet, wallet_pk) = Wallet::new();
+        println!("{}", wallet.to_string());
+        let transaction: TransactionInfo;
+    }
+}

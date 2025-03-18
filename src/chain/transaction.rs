@@ -1,4 +1,4 @@
-use std::fmt;
+//use std::fmt;
 
 use super::wallet::Wallet;
 use rsa::pkcs1v15::Signature;
