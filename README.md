@@ -88,6 +88,10 @@ To run the tests for the project, use the following command:
 cargo test
 ```
 This will run all unit tests, integration tests, and any other tests defined in this project.
+If you wish to run with output run:
+``` bash
+cargo test -- --nocapture
+```
 
 ## Contributing
 We welcome contributions to the CleytoCoin project. If you have an idea or find a bug, please feel free to submit an issue or a pull request.
