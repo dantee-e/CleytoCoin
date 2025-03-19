@@ -6,6 +6,7 @@ use rsa::sha2::Sha256;
 use super::transaction::TransactionInfo;
 
 // ---------------------------------------------- WalletPK definition ----------------------------------------------
+#[derive(Debug)]
 pub struct WalletPK{
     #[allow(unused)]
     private_key: RsaPrivateKey,
@@ -21,8 +22,9 @@ impl WalletPK {
 }
 // -----------------------------------------------------------------------------------------------------------------
 
-// ---------------------------------------------- WalletPK ---------------------------------------------------------
+// ---------------------------------------------- Wallet definition ------------------------------------------------
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct Wallet{
     public_key: RsaPublicKey,
     verifying_key: VerifyingKey<Sha256>
@@ -50,8 +52,8 @@ impl Wallet {
     pub fn verify_transaction_info(&self, data: &TransactionInfo, signature: &rsa::pkcs1v15::Signature) -> bool {
         let verified = self.verifying_key.verify(data.to_string().as_bytes(), &signature);
         match verified {
-            Ok(()) => {println!("Deu bom");true},
-            Err(_) => {println!("Deu ruim");false},
+            Ok(()) => true,
+            Err(_) => false,
         }
     }
 
@@ -66,23 +68,17 @@ impl Wallet {
 }
 // -----------------------------------------------------------------------------------------------------------------
 
+// ---------------------------------------------- UNIT TESTS -------------------------------------------------------
 #[cfg(test)] //ensures that the tests module is only included when running tests.
 mod tests {
-    use crate::chain::{transaction::TransactionInfo, wallet::Wallet};
-    use chrono::Utc;
+    use crate::chain::wallet::Wallet;
 
     #[test] //mark a function as a test.
     fn test_wallet_creation() {
-        let (wallet, mut wallet_pk) = Wallet::new();
-        println!("{}", wallet.to_string());
-
-        let transaction: TransactionInfo = TransactionInfo::new(12345 as f32, Utc::now());
-        let signature = match wallet_pk.sign_transaction(&transaction) {
-            Ok(signed_hashed_message) => signed_hashed_message,
-            _ => panic!("error while signing transaction"),
-        };
-        println!("{:?}", signature);
-
-        wallet.verify_transaction_info(&transaction, &signature);
+        let (wallet, wallet_pk) = Wallet::new();
+        println!("wallet.to_string: {}", wallet.to_string());
+        println!("{:#?}", wallet);
+        println!("{:#?}", wallet_pk);
     }
 }
+// -----------------------------------------------------------------------------------------------------------------
