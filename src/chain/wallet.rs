@@ -43,8 +43,7 @@ impl Wallet {
             },
             WalletPK{
                 private_key,
-                signing_key,
-            }
+                signing_key, }
         )
     }
 
@@ -69,12 +68,21 @@ impl Wallet {
 
 #[cfg(test)] //ensures that the tests module is only included when running tests.
 mod tests {
-    use super::Wallet;
+    use crate::chain::{transaction::TransactionInfo, wallet::Wallet};
+    use chrono::Utc;
 
     #[test] //mark a function as a test.
     fn test_wallet_creation() {
-        let (wallet, wallet_pk) = Wallet::new();
+        let (wallet, mut wallet_pk) = Wallet::new();
         println!("{}", wallet.to_string());
-        let transaction: TransactionInfo;
+
+        let transaction: TransactionInfo = TransactionInfo::new(12345 as f32, Utc::now());
+        let signature = match wallet_pk.sign_transaction(&transaction) {
+            Ok(signed_hashed_message) => signed_hashed_message,
+            _ => panic!("error while signing transaction"),
+        };
+        println!("{:?}", signature);
+
+        wallet.verify_transaction_info(&transaction, &signature);
     }
 }

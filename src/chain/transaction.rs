@@ -4,9 +4,6 @@ use super::wallet::Wallet;
 use rsa::pkcs1v15::Signature;
 use chrono::{DateTime, Utc};
 
-
-
-
 #[derive(Clone)]
 pub struct TransactionInfo {
     value: f32,
@@ -28,7 +25,6 @@ impl TransactionInfo {
             self.date.to_string()
         )
     }
-
 }
 
 #[derive(Clone)]
