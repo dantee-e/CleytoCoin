@@ -11,6 +11,10 @@
 - [Testing](#testing)
 - [Contributing](#contributing)
 
+# CleytoCoin is still under development, so many of the features listed underneath aren't yet functional.
+We appreciate the interest and are working towards making CleytoCoin a functional and reliable cryptocurrency, but currently it's still in it's early development stages.
+Feel free to give sugestions in the meantime of what you'd like to see implemented in our project!
+
 ## About
 
 **CleytoCoin** is a cryptocurrency built using the Rust programming language. This project aims to create a secure, fast, and decentralized cryptocurrency to facilitate peer-to-peer transactions.
