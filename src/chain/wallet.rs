@@ -38,7 +38,7 @@ impl Wallet {
         
         (
             Wallet{
-                public_key, 
+                public_key,
                 verifying_key
             },
             WalletPK{

@@ -1,6 +1,9 @@
 use sha2::{Sha256, Digest};
 
 
+
+pub const PROOF_OF_WORK_DIFFICULTY: u8 = 4;
+
 pub struct HashedData{
     hash: [u8;32],
 }
@@ -34,28 +37,3 @@ impl HashedData {
     }
 }
 
-/* pub struct Date{
-    year: u32,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: u32,
-}
-
-impl Date {
-    pub fn now() -> Self {
-        let now = Local::now();
-        Self {
-            year: now.year_ce().1,
-            month: now.month(),
-            day: now.day(),
-            hour: now.hour(),
-            minute: now.minute(),
-            second: now.second(),
-        }
-    }
-    fn to_string(&self) -> String {
-        format!("{}.{}.{}.{}.{}.{}", self.year, self.month, self.day, self.hour, self.minute, self.second)
-    }
-} */
