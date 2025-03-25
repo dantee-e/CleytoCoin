@@ -10,7 +10,7 @@ use super::utils::PROOF_OF_WORK_DIFFICULTY;
 pub struct Block {
     previous_hash: String,
     transactions: Vec<Transaction>,
-    index: i64,
+    index: u64,
     timestamp: DateTime<Utc>,
     hash: String,
     nonce: u64
@@ -102,5 +102,3 @@ impl Block {
         self
     }
 }
-
-
