@@ -1,13 +1,12 @@
-use std::fmt;
+//use std::fmt;
 
 use super::wallet::Wallet;
 use rsa::pkcs1v15::Signature;
 use chrono::{DateTime, Utc};
 
-
-
-
 #[derive(Clone)]
+#[derive(Debug)]
+// ---------------------------------------------- TransactionInfo definition ----------------------------------------
 pub struct TransactionInfo {
     value: f32,
     date: DateTime<Utc>
@@ -28,9 +27,10 @@ impl TransactionInfo {
             self.date.to_string()
         )
     }
-
 }
+// -----------------------------------------------------------------------------------------------------------------
 
+// ---------------------------------------------- Transaction definition -------------------------------------------
 #[derive(Clone)]
 pub struct Transaction {
     pub sender: Wallet,
@@ -40,25 +40,20 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn new(sender: Wallet, receiver: Wallet, transaction_info: TransactionInfo, signature: Signature) -> Self{
+    pub fn new(sender: Wallet, receiver: Wallet, transaction_info: TransactionInfo, signature: Signature) -> Self {
         
         let verify_signature = sender.verify_transaction_info(&transaction_info, &signature);
         
         if verify_signature {
-            println!("Assinatura verificada com sucesso");
-            Self{
+            Self {
                 sender,
                 receiver,
                 signature,
                 transaction_info
             }
-        }
-        /* verifying_key.; */
-
-        else {
+        } else {
             panic!("Signature couldn't be verified");
         }
-        
     }
 
     pub fn to_string(&self) -> String {
@@ -71,3 +66,18 @@ impl Transaction {
         )
     }
 }
+
+// ---------------------------------------------- UNIT TESTS -------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use crate::chain::{transaction::TransactionInfo, wallet::Wallet};
+    use chrono::Utc;
+
+    #[test] //mark a function as a test.
+    fn test_transactioninfo_creation() {
+        let transaction: TransactionInfo = TransactionInfo::new(12345 as f32, Utc::now());
+        println!("transaction info:\n{}", transaction.to_string());
+        println!("{:?}", transaction);
+    }
+}
+// -----------------------------------------------------------------------------------------------------------------

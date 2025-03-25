@@ -1,13 +1,12 @@
-use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use rsa::{RsaPrivateKey, RsaPublicKey};
 use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 use rsa::signature::{Keypair, RandomizedSigner, Verifier};
 use rsa::pkcs1::EncodeRsaPublicKey;
 use rsa::sha2::Sha256;
-use rand::rngs::ThreadRng;
 use super::transaction::TransactionInfo;
 
-
-
+// ---------------------------------------------- WalletPK definition ----------------------------------------------
+#[derive(Debug)]
 pub struct WalletPK{
     #[allow(unused)]
     private_key: RsaPrivateKey,
@@ -21,8 +20,11 @@ impl WalletPK {
         Ok(signed_hashed_message)
     }
 }
+// -----------------------------------------------------------------------------------------------------------------
 
+// ---------------------------------------------- Wallet definition ------------------------------------------------
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct Wallet{
     public_key: RsaPublicKey,
     verifying_key: VerifyingKey<Sha256>
@@ -30,10 +32,10 @@ pub struct Wallet{
 
 impl Wallet {
     pub fn new() -> (Self, WalletPK) {
-        let bits = 2048;
-        let private_key = RsaPrivateKey::new(&mut rand::thread_rng(), bits).expect("failed to generate a key");
-        let public_key = RsaPublicKey::from(&private_key);
-        let signing_key = SigningKey::<Sha256>::new(private_key.clone());
+        let bits: usize = 2048;
+        let private_key: RsaPrivateKey = RsaPrivateKey::new(&mut rand::thread_rng(), bits).expect("failed to generate a key");
+        let public_key: RsaPublicKey = RsaPublicKey::from(&private_key);
+        let signing_key: SigningKey<Sha256> = SigningKey::<Sha256>::new(private_key.clone());
         let verifying_key = signing_key.verifying_key();
         
         (
@@ -43,16 +45,15 @@ impl Wallet {
             },
             WalletPK{
                 private_key,
-                signing_key,
-            }
+                signing_key, }
         )
     }
 
     pub fn verify_transaction_info(&self, data: &TransactionInfo, signature: &rsa::pkcs1v15::Signature) -> bool {
         let verified = self.verifying_key.verify(data.to_string().as_bytes(), &signature);
         match verified {
-            Ok(()) => {println!("Deu bom");true},
-            Err(_) => {println!("Deu ruim");false},
+            Ok(()) => true,
+            Err(_) => false,
         }
     }
 
@@ -64,6 +65,20 @@ impl Wallet {
     pub fn get_public_key(&self) -> RsaPublicKey {
         self.public_key.clone()
     }
-
-    
 }
+// -----------------------------------------------------------------------------------------------------------------
+
+// ---------------------------------------------- UNIT TESTS -------------------------------------------------------
+#[cfg(test)] //ensures that the tests module is only included when running tests.
+mod tests {
+    use crate::chain::wallet::Wallet;
+
+    #[test] //mark a function as a test.
+    fn test_wallet_creation() {
+        let (wallet, wallet_pk) = Wallet::new();
+        println!("wallet.to_string: {}", wallet.to_string());
+        println!("{:#?}", wallet);
+        println!("{:#?}", wallet_pk);
+    }
+}
+// -----------------------------------------------------------------------------------------------------------------

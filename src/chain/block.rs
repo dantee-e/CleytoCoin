@@ -1,7 +1,3 @@
-use core::hash;
-use std::ptr::hash;
-use serde::{Serialize, Deserialize};
-
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
@@ -21,7 +17,7 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn get_hash(&self) -> String{
+    pub fn get_hash(&self) -> String {
         self.hash.clone()
     }
 

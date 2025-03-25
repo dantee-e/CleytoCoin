@@ -7,8 +7,6 @@ use chrono::{DateTime, Utc};
 use sha2::Sha256;
 use transaction::Transaction as Transaction;
 
-pub mod testes;
-
 pub struct Chain {
     blocks: Vec<block::Block>
 }
