@@ -1,10 +1,19 @@
-use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
-use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+use rsa::{RsaPrivateKey, RsaPublicKey};
+use rsa::pkcs1v15::{SigningKey, VerifyingKey}; // TODO mudar protocolo sendo usado para assinaturas
 use rsa::signature::{Keypair, RandomizedSigner, Verifier};
 use rsa::pkcs1::EncodeRsaPublicKey;
 use rsa::sha2::Sha256;
-use rand::rngs::ThreadRng;
 use super::transaction::TransactionInfo;
+
+// Criar um node com uma port no localhost para receber transacoes, e de x em x tempos fechar o bloco
+
+// Encontrar nodes
+
+// Quando fechar o bloco, emitir essa info pra outros nodes
+
+// Minerar o bloco
+
+
 
 
 
