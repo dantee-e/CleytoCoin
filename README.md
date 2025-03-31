@@ -11,6 +11,10 @@
 - [Testing](#testing)
 - [Contributing](#contributing)
 
+# CleytoCoin is still under development, so many of the features listed underneath aren't yet functional.
+We appreciate the interest and are working towards making CleytoCoin a functional and reliable cryptocurrency, but currently it's still in it's early development stages.
+Feel free to give sugestions in the meantime of what you'd like to see implemented in our project!
+
 ## About
 
 **CleytoCoin** is a cryptocurrency built using the Rust programming language. This project aims to create a secure, fast, and decentralized cryptocurrency to facilitate peer-to-peer transactions.
@@ -88,6 +92,10 @@ To run the tests for the project, use the following command:
 cargo test
 ```
 This will run all unit tests, integration tests, and any other tests defined in this project.
+If you wish to run with output run:
+``` bash
+cargo test -- --nocapture
+```
 
 ## Contributing
 We welcome contributions to the CleytoCoin project. If you have an idea or find a bug, please feel free to submit an issue or a pull request.
