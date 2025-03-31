@@ -3,6 +3,8 @@ use chain::{block, transaction::{Transaction, TransactionInfo}};
 use chrono::Utc;
 use chain::wallet::Wallet;
 
+
+
 fn main() {
     let (wallet1, mut wallet1_pk) = Wallet::new();
     let (wallet2, _) = Wallet::new();

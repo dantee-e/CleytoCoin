@@ -5,15 +5,6 @@ use rsa::pkcs1::EncodeRsaPublicKey;
 use rsa::sha2::Sha256;
 use super::transaction::TransactionInfo;
 
-// Criar um node com uma port no localhost para receber transacoes, e de x em x tempos fechar o bloco
-
-// Encontrar nodes
-
-// Quando fechar o bloco, emitir essa info pra outros nodes
-
-// Minerar o bloco
-
-
 
 
 
