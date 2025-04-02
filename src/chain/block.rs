@@ -3,15 +3,17 @@ use sha2::{Digest, Sha256};
 
 use super::transaction::Transaction;
 use super::Chain;
+use super::utils::PROOF_OF_WORK_DIFFICULTY;
 
 
 #[derive(Clone)]
 pub struct Block {
     previous_hash: String,
     transactions: Vec<Transaction>,
-    index: i64,
+    index: u64,
     timestamp: DateTime<Utc>,
     hash: String,
+    nonce: u64
 }
 
 impl Block {
@@ -42,7 +44,9 @@ impl Block {
             &self.index,
             "::END_INDEX::BEGIN_TIMESTAMP::",
             &self.timestamp.to_string(),
-            "::END_TIMESTAMP::END::",
+            "::END_TIMESTAMP::BEGIN_NONCE::",
+            &self.nonce,
+            "::END_NONCE::END",
         )).expect("Coudn't serialize the block to create the hash");
 
         println!("behold the serialized block:\n{serialized}");
@@ -50,7 +54,8 @@ impl Block {
         let mut hasher = Sha256::new();
         hasher.update(serialized.as_bytes());
         let result = hasher.finalize();
-
+        let encoded_result = hex::encode(result);
+        println!("Hash = {encoded_result}");
         hex::encode(result) // Converts bytes to a hex string
     }
 
@@ -65,7 +70,8 @@ impl Block {
             transactions,
             index,
             timestamp,
-            hash: String::new() // temporary so that we can calculate hash
+            hash: String::new(),
+            nonce: 0 // temporary so that we can calculate hash
         };
 
         block.hash = block.calculate_hash();
@@ -80,7 +86,19 @@ impl Block {
             transactions: Vec::new(),
             index: 0,
             timestamp: Utc::now(),
-            hash: String::from("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
+            hash: String::from("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"),
+            nonce: 0
         }
+    }
+
+    pub fn mine_block(mut self) -> Self {
+        let prefix = "0".repeat(PROOF_OF_WORK_DIFFICULTY.into());
+
+        while !self.hash.starts_with(&prefix) {
+            self.nonce+=1;
+            self.hash = self.calculate_hash();
+        }
+
+        self
     }
 }

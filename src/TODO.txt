@@ -1,3 +1,4 @@
+
 - Criar um node com uma port no localhost para receber transacoes, e de x em x tempos fechar o bloco
 
 - Encontrar nodes
