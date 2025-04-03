@@ -1,22 +1,38 @@
+mod utils;
+mod resolve_requests;
+
+use resolve_requests::methods;
+use crate::chain::transaction::Transaction;
+
+
+
 use std::{
-    io::{prelude::*, BufReader},
-    net::{TcpListener, TcpStream},
+    io::{prelude::*, BufReader}, net::{TcpListener, TcpStream}
 };
 use std::io;
 
+
+
+
+
 pub struct Node {
-    default_port: u16
+    port: u16,
+    transactions_list: Vec<Transaction>
 }
 
 impl Node {
+
 
     const DEFAULT_PORT: u16 = 9473;
 
     pub fn new(port: u16) -> Self {
         Node {
-            default_port: port
+            port: port,
+            transactions_list: Vec::new()
         }
     }
+
+    
 
     fn handle_connection(stream: TcpStream){
         let buf_reader = BufReader::new(&stream);
@@ -26,7 +42,30 @@ impl Node {
             .take_while(|line| !line.is_empty())
             .collect();
 
-        println!("Request: {http_request:#?}");
+        let mut request_tokens = http_request[0].split(' '); // iterator
+        
+        let method = if let Some(token) = request_tokens.next() {
+            token
+        } else {
+            methods::return_json(&stream, methods::HTTPResponse::BadRequest);
+            "shit happened"
+        };
+
+        let endpoint = if let Some(token) = request_tokens.next() {
+            token
+        } else {
+            methods::return_json(&stream, methods::HTTPResponse::BadRequest);
+            "shit happened"
+        };
+
+        match method {
+            "GET" => methods::get(&stream, endpoint),
+            "POST" => methods::post(&stream, endpoint),
+            _ => {
+                methods::return_json(&stream, methods::HTTPResponse::InvalidMethod);
+            }
+        }
+
     }
 
     pub fn run() {
@@ -37,6 +76,7 @@ impl Node {
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read port");
+
 
         port = if input.trim().is_empty() {
             Self::DEFAULT_PORT
@@ -50,7 +90,12 @@ impl Node {
             }
         };
 
+        println!("Activating listener...");
+
         let listener = TcpListener::bind(format!("127.0.0.1:{port}")).unwrap();
+
+        println!("Listening to new connections on port {port}!");
+
 
         for stream in listener.incoming() {
             let stream = stream.unwrap();

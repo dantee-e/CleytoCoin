@@ -57,33 +57,33 @@ This will compile the project and generate an optimized binary in the `target/re
 ### Starting the node
 To start the cryptocurrency node, use the following command:
 ``` bash
-cargo run --bin CleytoCoin
+cargo run --bin cleyto_coin
 ```
 The node will start and connect to the network. You can start mining or send/receive transactions.
 
 ### Creating a wallet
 To generate a new wallet, run the following:
 ``` bash
-cargo run --bin CleytoCoin-wallet generate
+cargo run --bin cleyto_coin-wallet generate
 ```
 This will generate a private key and address for your wallet.
 
 ### Sending a transaction
 To send a transaction, use the following command:
 ``` bash
-cargo run --bin CleytoCoin-wallet send --to <recipient_address> --amount <amount> --private-key <your_private_key>
+cargo run --bin cleyto_coin-wallet send --to <recipient_address> --amount <amount> --private-key <your_private_key>
 ```
 
 ### Mining
 Start mining by running:
 ``` bash
-cargo run --bin CleytoCoin-miner start --mining-key <your_private_key>
+cargo run --bin cleyto_coin-miner start --mining-key <your_private_key>
 ```
 
 ### Stopping the node
 To stop the node, press `CTRL+C` or run the following:
 ``` bash
-cargo run --bin CleytoCoin stop
+cargo run --bin cleyto_coin stop
 ```
 
 ## Testing

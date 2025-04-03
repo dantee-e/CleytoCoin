@@ -3,9 +3,6 @@ pub mod transaction;
 pub mod block;
 pub mod wallet;
 use block::Block;
-use chrono::{DateTime, Utc};
-use sha2::Sha256;
-use transaction::Transaction as Transaction;
 
 pub struct Chain {
     blocks: Vec<block::Block>
