@@ -1,13 +1,13 @@
 mod utils;
 mod resolve_requests;
 
-use resolve_requests::methods;
+use resolve_requests::methods::{self, HTTPParseError};
 use crate::chain::transaction::Transaction;
 
 
 
 use std::{
-    io::{prelude::*, BufReader}, net::{TcpListener, TcpStream}
+    collections::HashMap, io::{prelude::*, BufReader}, net::{TcpListener, TcpStream}
 };
 use std::io;
 
@@ -21,8 +21,6 @@ pub struct Node {
 }
 
 impl Node {
-
-
     const DEFAULT_PORT: u16 = 9473;
 
     pub fn new(port: u16) -> Self {
@@ -32,7 +30,22 @@ impl Node {
         }
     }
 
-    
+    fn parse_http_request(http_request: Vec<String>) -> Result<methods::HTTPRequest, methods::HTTPParseError> {
+        let mut tokens =  http_request[0].split(' ');
+        let (method, path, http_version) = (
+            tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string(),
+            tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string(), 
+            tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string()
+        );
+
+        let headers = HashMap::new();
+        let body = Some(String::new());
+
+
+
+
+        Ok(methods::HTTPRequest::new(method, path, http_version, headers, body))
+    }
 
     fn handle_connection(stream: TcpStream){
         let buf_reader = BufReader::new(&stream);
@@ -44,27 +57,8 @@ impl Node {
 
         let mut request_tokens = http_request[0].split(' '); // iterator
         
-        let method = if let Some(token) = request_tokens.next() {
-            token
-        } else {
-            methods::return_json(&stream, methods::HTTPResponse::BadRequest);
-            "shit happened"
-        };
-
-        let endpoint = if let Some(token) = request_tokens.next() {
-            token
-        } else {
-            methods::return_json(&stream, methods::HTTPResponse::BadRequest);
-            "shit happened"
-        };
-
-        match method {
-            "GET" => methods::get(&stream, endpoint),
-            "POST" => methods::post(&stream, endpoint),
-            _ => {
-                methods::return_json(&stream, methods::HTTPResponse::InvalidMethod);
-            }
-        }
+        let request_object = Self::parse_http_request(http_request);
+        
 
     }
 
