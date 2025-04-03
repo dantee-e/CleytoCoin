@@ -3,20 +3,6 @@
 version = 3
 
 [[package]]
-name = "CleytoCoin"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "hex",
- "rand",
- "rsa",
- "serde",
- "serde_json",
- "sha2",
- "tiny-bip39",
-]
-
-[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -91,6 +77,20 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
  "windows-link",
+]
+
+[[package]]
+name = "cleyto_coin"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "rand",
+ "rsa",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tiny-bip39",
 ]
 
 [[package]]

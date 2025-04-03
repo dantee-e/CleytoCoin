@@ -1,4 +1,4 @@
-use CleytoCoin::chain::{transaction::TransactionInfo, wallet::Wallet};
+use cleyto_coin::chain::{transaction::TransactionInfo, wallet::Wallet};
 use chrono::Utc;
 
 #[test]

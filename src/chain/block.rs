@@ -21,7 +21,7 @@ impl Block {
         self.hash.clone()
     }
 
-    pub fn get_index(&self) -> i64 {
+    pub fn get_index(&self) -> u64 {
         self.index.clone()
     }
 
