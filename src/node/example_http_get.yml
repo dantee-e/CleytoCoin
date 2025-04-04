@@ -1,4 +1,4 @@
-GET / HTTP/1.1
+POST / HTTP/1.1
 Host: localhost:9473
 Connection: keep-alive
 sec-ch-ua: "Not(A:Brand";v="99", "Brave";v="133", "Chromium";v="133"
@@ -16,3 +16,10 @@ Sec-Fetch-User: ?1
 Sec-Fetch-Dest: document
 Accept-Encoding: gzip, deflate, br, zstd
 Cookie: session=eyJpZCI6ICIxZjZjNDBiNS02YTBkLTRiOWYtOGY4Yy1kYzQ4N2NjYmQ5OT
+
+
+POST / HTTP/1.1
+content-type: application/json
+content-length: 36
+accept: */*
+host: localhost:9473

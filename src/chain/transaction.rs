@@ -70,7 +70,7 @@ impl Transaction {
 // ---------------------------------------------- UNIT TESTS -------------------------------------------------------
 #[cfg(test)]
 mod tests {
-    use crate::chain::{transaction::TransactionInfo, wallet::Wallet};
+    use crate::chain::transaction::TransactionInfo;
     use chrono::Utc;
 
     #[test] //mark a function as a test.

@@ -5,7 +5,7 @@ use chrono::Utc;
 #[test]
 fn create_transaction() {
     let (wallet_sender, mut walletpk_sender) = Wallet::new();
-    let (wallet_receiver, walletpk_receiver) = Wallet::new();
+    let (wallet_receiver, _) = Wallet::new();
     let transactioninfo: TransactionInfo = TransactionInfo::new(12345 as f32, Utc::now());
 
     let signature = match walletpk_sender.sign_transaction(&transactioninfo) {

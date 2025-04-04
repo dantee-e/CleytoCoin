@@ -11,6 +11,7 @@ pub mod methods {
         BadRequest
     }
 
+    #[derive(Debug)]
     pub struct HTTPRequest {
         method: String,
         path: String,
@@ -29,25 +30,35 @@ pub mod methods {
                 body,
             }
         }
+
+        pub fn get_method(&self) -> String {
+            self.method.clone()
+        }
+        pub fn get_path(&self) -> String {
+            self.path.clone()
+        }
     }
 
     #[derive(Debug)]
     pub enum HTTPParseError {
+        InvalidStatusLine,
         InvalidRequestLine,
         MissingFields,
+        MissingContentLength
     }
     impl fmt::Display for HTTPParseError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
                 HTTPParseError::InvalidRequestLine => write!(f, "Invalid request line"),
                 HTTPParseError::MissingFields => write!(f, "Missing required fields"),
+                HTTPParseError::InvalidStatusLine => write!(f, "Invalid status line"),
+                HTTPParseError::MissingContentLength => write!(f, "Missing content-length field in headers"),
             }
         }
     }
     impl std::error::Error for HTTPParseError {}
 
     
-    type Result<T> = std::result::Result<T, HTTPParseError>;
 
     pub fn return_json(mut stream: &TcpStream, status: HTTPResponse){
         
@@ -77,10 +88,12 @@ pub mod methods {
         stream.write_all(response.as_bytes()).unwrap();
     }
 
-    pub fn get(stream: &TcpStream, endpoint: &str) {
+    pub fn get(stream: &TcpStream, request: HTTPRequest) {
+        println!("{:#?}", request);
         return_json(stream, HTTPResponse::OK);
     }
-    pub fn post(stream: &TcpStream, endpoint: &str) {
+    pub fn post(stream: &TcpStream, request: HTTPRequest) {
+        println!("{:#?}", request);
         return_json(&stream, HTTPResponse::OK);
     }
 }
