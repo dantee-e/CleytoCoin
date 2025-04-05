@@ -1,14 +1,14 @@
 
 pub mod endpoints {
-    use super::methods::HTTPRequest;
+    use super::methods::{self, HTTPRequest, HTTPResponse};
 
 
     fn path_not_found(){
 
     }
 
-    fn index(){
-
+    fn index(mut request: HTTPRequest){
+        request.response_json(HTTPResponse::OK);
     }
 
 
@@ -16,14 +16,14 @@ pub mod endpoints {
         
         if request.get_method() == "GET" {
             match request.get_path().as_str() {
-                "/" => index(),
+                "/" => index(request),
                 _ => path_not_found(),
             }
         }
 
         else if request.get_method() == "POST" {
             match request.get_path().as_str() {
-                "/" => index(),
+                "/" => index(request),
                 _ => path_not_found(),
             }
         }
@@ -47,6 +47,7 @@ pub mod methods {
 
     #[derive(Debug)]
     pub struct HTTPRequest {
+        stream: Option<TcpStream>,
         method: String,
         path: String,
         http_version: String,
@@ -55,8 +56,9 @@ pub mod methods {
     }
 
     impl HTTPRequest {
-        pub fn new(method:String, path: String, http_version: String, headers: HashMap<String, String>, body: Option<String>) -> HTTPRequest {
+        pub fn new(stream: Option<TcpStream>, method:String, path: String, http_version: String, headers: HashMap<String, String>, body: Option<String>) -> HTTPRequest {
             HTTPRequest {
+                stream,
                 method,
                 path,
                 http_version,
@@ -65,11 +67,43 @@ pub mod methods {
             }
         }
 
+        pub fn set_stream(&mut self, stream: TcpStream) {
+            self.stream = Some(stream);
+        }
+
         pub fn get_method(&self) -> String {
             self.method.clone()
         }
         pub fn get_path(&self) -> String {
             self.path.clone()
+        }
+
+        pub fn response_json(&mut self, status: HTTPResponse) {
+            let mut stream = self.stream.as_ref().unwrap();
+            let (msg, status_code) = match status {
+                HTTPResponse::OK => ("The request was successful".to_owned(), 200),
+                HTTPResponse::InvalidMethod => ("Invalid HTTP method".to_owned(), 405),
+                HTTPResponse::BadRequest => ("Bad Request".to_owned(), 400)
+            };
+    
+            let response = json!({
+                "msg": msg,
+                "status_code": status_code
+            });
+    
+            let success_json = serde_json::to_string(&response)
+                .expect("Couldn't convert the object to json");
+    
+            let response = format!(
+                "HTTP/1.1 200 OK\r\n\
+                Content-Type: application/json\r\n\
+                Content-Length: {}\r\n
+    {}", 
+                success_json.len(),
+                success_json
+            );
+    
+            stream.write_all(response.as_bytes()).unwrap();
         }
     }
 

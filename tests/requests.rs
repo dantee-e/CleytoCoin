@@ -58,7 +58,7 @@ fn post_and_get_request(){
         node::Node::run(true, rx, 0);
     }); */
 
-    for _ in 0..30 {
+    for _ in 0..200 {
         match post_request() {
             Ok(_) => println!("Post successful"),
             Err(_) => println!("Post failed"),
@@ -76,6 +76,37 @@ fn post_and_get_request(){
     server.join().expect("Server thread panicked."); */
 }
 
+#[test]
+fn thread_posts(){
+    let url = "http://localhost:9473/"; // Replace with your server URL
+    let client = Client::new();
 
+    let mut handles = vec![];
 
+    for i in 0..10000 {
+        let client = client.clone();
+        let url = url.to_string();
 
+        let handle = thread::spawn(move || {
+            let body = format!(r#"{{"message": "Hello #{}"}}"#, i);
+
+            match client.post(&url)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .send()
+            {
+                
+                Ok(resp) => {assert_eq!(resp.status(), 200);println!("Thread #{i}: {}", resp.status())},
+                Err(err) => eprintln!("Thread #{i} failed: {err}"),
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        let _ = handle.join();
+    }
+
+    println!("All 200 threads finished.");
+}

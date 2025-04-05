@@ -2,7 +2,7 @@ mod utils;
 mod resolve_requests;
 mod thread_pool;
 
-use core::panic;
+use core::{num, panic};
 use std::time::Duration;
 use resolve_requests::{
     methods::{self, return_json, HTTPParseError, HTTPRequest, HTTPResponse},
@@ -10,7 +10,6 @@ use resolve_requests::{
 };
 use crate::chain::transaction::Transaction;
 use thread_pool::custom_thread_pool::ThreadPool;
-
 
 
 
@@ -27,13 +26,17 @@ pub struct Node {
     transactions_list: Vec<Transaction>
 }
 
+use once_cell::sync::Lazy;
+static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
+
 impl Node {
+    
     // these configurations should be moved to a file
     pub const DEFAULT_PORT: u16 = 9473;
     pub const REFRESH_RATE_SERVER_IN_MS: u64 = 50;
-    pub const NUMBER_OF_THREADS_IN_THREAD_POOL: usize = 10;
 
     pub fn new(port: u16) -> Node {
+        num_cpus::get();
     
         Node {
             port: port,
@@ -41,13 +44,11 @@ impl Node {
         }
     }
 
-    fn parse_http_request<R: Read>(stream: &TcpStream,mut buf_reader: BufReader<R>) -> Result<HTTPRequest, HTTPParseError> {
+    fn parse_http_request<R: Read>(mut buf_reader: BufReader<R>) -> Result<HTTPRequest, HTTPParseError> {
 
         let mut http_headers: HashMap<String, String> = HashMap::new();
         let http_body: Option<String>;
 
-
-        println!("Beginning of request");
 
         let mut line = String::new();
 
@@ -70,10 +71,6 @@ impl Node {
             tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string()
         );
 
-
-        
-
-        
         // reading headers
         loop {
             line.clear();
@@ -92,14 +89,14 @@ impl Node {
             if let Some((key, value)) = line.split_once(":") {
                 http_headers.insert(key.trim().to_string(), value.trim().to_string());
             } else {
-                return_json(stream, HTTPResponse::BadRequest);
+                return Err(HTTPParseError::InvalidRequestLine);
             };
         
         }
         
         // If method is GET, return before trying to read the body
         if method == "GET" {
-            return Ok(HTTPRequest::new(method, path, http_version, http_headers, None))
+            return Ok(HTTPRequest::new(None, method, path, http_version, http_headers, None))
         }
 
 
@@ -109,12 +106,10 @@ impl Node {
             Some(value) => match value.parse::<usize>() {
                 Ok(length) => length,
                 Err(_) => {
-                    return_json(stream, HTTPResponse::BadRequest);
                     return Err(HTTPParseError::MissingContentLength);
                 }
             },
             None => {
-                return_json(stream, HTTPResponse::BadRequest);
                 return Err(HTTPParseError::MissingContentLength);
             },
         };
@@ -123,7 +118,7 @@ impl Node {
         let mut body = vec![0; content_length];
         if let Err(e) = buf_reader.read_exact(&mut body) {
             eprintln!("Error reading body: {}", e);
-            return_json(&stream, HTTPResponse::BadRequest);
+            return Err(HTTPParseError::InvalidRequestLine);
         }
 
         http_body = Some(String::from_utf8_lossy(&body).to_string());
@@ -135,24 +130,24 @@ impl Node {
 
 
 
-        Ok(HTTPRequest::new(method, path, http_version, http_headers, http_body))
+        Ok(HTTPRequest::new(None, method, path, http_version, http_headers, http_body))
     }
 
     fn handle_connection(stream: TcpStream){
         let buf_reader = BufReader::new(&stream);
         
-
-        println!("End of request");
         
-        let request_object: HTTPRequest;
-        match Self::parse_http_request(&stream, buf_reader) {
-            Ok(value) => request_object = value,
+        let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {
+            Ok(value) => value,
             Err(e) => {
                 println!("Error processing HTTP request: {e}");
                 return_json(&stream, HTTPResponse::BadRequest);
                 return;
             },
         };
+
+        request_object.set_stream(stream);
+
 
         resolve_endpoint(request_object);
 
@@ -182,7 +177,7 @@ impl Node {
 
         listener.set_nonblocking(true).expect("Cannot set non-blocking");
 
-        let thread_pool = match ThreadPool::new(Self::NUMBER_OF_THREADS_IN_THREAD_POOL){
+        let thread_pool = match ThreadPool::new(*NUMBER_OF_THREADS_IN_THREAD_POOL){
             Ok(value) => value,
             Err(e) => panic!("{e}"),
         };
