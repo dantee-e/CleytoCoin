@@ -1,6 +1,7 @@
 
 pub mod endpoints {
-    use super::methods::{self, HTTPRequest, HTTPResponse};
+    use super::methods::{HTTPRequest, HTTPResponse, Method};
+
 
 
     fn path_not_found(){
@@ -13,26 +14,26 @@ pub mod endpoints {
 
 
     pub fn resolve_endpoint(request: HTTPRequest){
-        
-        if request.get_method() == "GET" {
-            match request.get_path().as_str() {
-                "/" => index(request),
-                _ => path_not_found(),
-            }
-        }
 
-        else if request.get_method() == "POST" {
-            match request.get_path().as_str() {
-                "/" => index(request),
-                _ => path_not_found(),
-            }
+        match request.get_method() {
+            Method::GET(data) => {
+                match data.path.as_str() {
+                    "/" => index(request),
+                    _ => path_not_found(),
+                }
+            },
+            Method::POST(data) => {
+                match data.path.as_str() {
+                    "/" => index(request),
+                    _ => path_not_found(),
+                }
+            },
         }
-        
-        
     }
 }
 
 pub mod methods {
+    use core::panic;
     use std::collections::HashMap;
     use std::fmt;
     use std::net::TcpStream;
@@ -45,25 +46,42 @@ pub mod methods {
         BadRequest
     }
 
+
+    #[derive(Debug, Clone)]
+    pub struct GETData {
+        pub path: String,
+        pub headers: HashMap<String, String>
+    }
+    #[derive(Debug, Clone)]
+    pub struct POSTData {
+        pub path: String,
+        pub headers: HashMap<String, String>,
+        pub body: Option<String>
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum Method {
+        GET(GETData),
+        POST(POSTData)
+    }
+
     #[derive(Debug)]
     pub struct HTTPRequest {
         stream: Option<TcpStream>,
-        method: String,
-        path: String,
+        method: Method,
         http_version: String,
-        headers: HashMap<String, String>,
-        body: Option<String>
     }
 
     impl HTTPRequest {
-        pub fn new(stream: Option<TcpStream>, method:String, path: String, http_version: String, headers: HashMap<String, String>, body: Option<String>) -> HTTPRequest {
+        pub fn new(stream: Option<TcpStream>, method: String, path: String, http_version: String, headers: HashMap<String, String>, body: Option<String>) -> HTTPRequest {
             HTTPRequest {
                 stream,
-                method,
-                path,
-                http_version,
-                headers,
-                body,
+                method: match method.as_str() {
+                    "GET" => Method::GET(GETData {headers, path}),
+                    "POST" => Method::POST(POSTData {headers, path, body}),
+                    _ => panic!("Unavailable method")
+                },
+                http_version
             }
         }
 
@@ -71,11 +89,8 @@ pub mod methods {
             self.stream = Some(stream);
         }
 
-        pub fn get_method(&self) -> String {
+        pub fn get_method(&self) -> Method {
             self.method.clone()
-        }
-        pub fn get_path(&self) -> String {
-            self.path.clone()
         }
 
         pub fn response_json(&mut self, status: HTTPResponse) {

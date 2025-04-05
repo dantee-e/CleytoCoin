@@ -2,10 +2,10 @@ mod utils;
 mod resolve_requests;
 mod thread_pool;
 
-use core::{num, panic};
+use core::panic;
 use std::time::Duration;
 use resolve_requests::{
-    methods::{self, return_json, HTTPParseError, HTTPRequest, HTTPResponse},
+    methods::{return_json, HTTPParseError, HTTPRequest, HTTPResponse},
     endpoints::resolve_endpoint
 };
 use crate::chain::transaction::Transaction;
@@ -22,7 +22,6 @@ use std::{
 
 
 pub struct Node {
-    port: u16,
     transactions_list: Vec<Transaction>
 }
 
@@ -39,7 +38,6 @@ impl Node {
         num_cpus::get();
     
         Node {
-            port: port,
             transactions_list: Vec::new()
         }
     }
@@ -126,11 +124,11 @@ impl Node {
 
 
 
-        
+        if method == "POST"{
+            return Ok(HTTPRequest::new(None, method, path, http_version, http_headers, http_body))
+        }
 
-
-
-        Ok(HTTPRequest::new(None, method, path, http_version, http_headers, http_body))
+        Err(HTTPParseError::InvalidStatusLine)        
     }
 
     fn handle_connection(stream: TcpStream){
