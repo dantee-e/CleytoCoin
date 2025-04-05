@@ -6,7 +6,9 @@ use core::panic;
 use std::time::Duration;
 use resolve_requests::methods::{self, return_json, HTTPParseError, HTTPRequest, HTTPResponse};
 use crate::chain::transaction::Transaction;
-use thread_pool::ThreadPool;
+use thread_pool::custom_thread_pool::ThreadPool;
+
+use rayon::prelude::*;
 
 
 
@@ -187,6 +189,8 @@ impl Node {
             Err(e) => panic!("{e}"),
         };
 
+        
+
         loop {
             // Check for termination signal
             if let Ok(lock) = rx.try_lock() {
@@ -198,9 +202,10 @@ impl Node {
             // Try accepting a connection
             match listener.accept() {
                 Ok((stream, addr)) => {
-                    thread_pool.execute(move ||{
+                    // rayon
+                    thread_pool.execute(|| {
                         Self::handle_connection(stream);
-                    });
+                    })
                 },
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     thread::sleep(Duration::from_millis(Self::REFRESH_RATE_SERVER_IN_MS));
@@ -210,6 +215,10 @@ impl Node {
                     break;
                 }
             }
-        }
+        }  
+
+        println!("Dropping thread pool");
+
+        drop(thread_pool);
     }
 }

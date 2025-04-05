@@ -2,9 +2,8 @@ pub mod chain;
 pub mod node;
 
 use std::{sync::{mpsc, Arc, Mutex}, thread};
-use std::io::Read;
 fn main(){
-    let (_, rx) = mpsc::channel::<()>();
+    let (tx, rx) = mpsc::channel::<()>();
 
     // Channel to kill thread
     let rx = Arc::new(Mutex::new(rx));
@@ -30,13 +29,15 @@ fn main(){
         println!("{:?}", input);
         
         match input.as_str() {
-            "quit" => {println!("quit program"); break;},
+            "quit" => {
+                println!("quitting server");
+                tx.send(()).unwrap();
+                break;
+            },
             _ => println!("no command")
 
         }
-        
-
     }
-
-    
+    // Waits for the node to stop running
+    server.join().unwrap();
 }
