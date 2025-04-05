@@ -1,3 +1,37 @@
+
+pub mod endpoints {
+    use super::methods::HTTPRequest;
+
+
+    fn path_not_found(){
+
+    }
+
+    fn index(){
+
+    }
+
+
+    pub fn resolve_endpoint(request: HTTPRequest){
+        
+        if request.get_method() == "GET" {
+            match request.get_path().as_str() {
+                "/" => index(),
+                _ => path_not_found(),
+            }
+        }
+
+        else if request.get_method() == "POST" {
+            match request.get_path().as_str() {
+                "/" => index(),
+                _ => path_not_found(),
+            }
+        }
+        
+        
+    }
+}
+
 pub mod methods {
     use std::collections::HashMap;
     use std::fmt;

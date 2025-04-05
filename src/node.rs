@@ -4,11 +4,13 @@ mod thread_pool;
 
 use core::panic;
 use std::time::Duration;
-use resolve_requests::methods::{self, return_json, HTTPParseError, HTTPRequest, HTTPResponse};
+use resolve_requests::{
+    methods::{self, return_json, HTTPParseError, HTTPRequest, HTTPResponse},
+    endpoints::resolve_endpoint
+};
 use crate::chain::transaction::Transaction;
 use thread_pool::custom_thread_pool::ThreadPool;
 
-use rayon::prelude::*;
 
 
 
@@ -152,11 +154,7 @@ impl Node {
             },
         };
 
-        match request_object.get_method().as_str() {
-            "GET" => methods::get(&stream, request_object),
-            "POST" => methods::post(&stream, request_object),
-            _ => return_json(&stream, HTTPResponse::InvalidMethod),
-        } 
+        resolve_endpoint(request_object);
 
         return;
          
