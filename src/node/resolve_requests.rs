@@ -9,7 +9,8 @@ pub mod endpoints {
     }
 
     fn index(mut request: HTTPRequest){
-        request.response_json(HTTPResponse::OK);
+
+        request.response(HTTPResponse::OK);
     }
 
 
@@ -35,7 +36,7 @@ pub mod endpoints {
 pub mod methods {
     use core::panic;
     use std::collections::HashMap;
-    use std::fmt;
+    use std::{fmt, fs};
     use std::net::TcpStream;
     use std::io::prelude::*;
     use serde_json::json;
@@ -49,13 +50,11 @@ pub mod methods {
 
     #[derive(Debug, Clone)]
     pub struct GETData {
-        pub path: String,
-        pub headers: HashMap<String, String>
+        pub path: String
     }
     #[derive(Debug, Clone)]
     pub struct POSTData {
         pub path: String,
-        pub headers: HashMap<String, String>,
         pub body: Option<String>
     }
 
@@ -65,9 +64,12 @@ pub mod methods {
         POST(POSTData)
     }
 
+    
+
     #[derive(Debug)]
     pub struct HTTPRequest {
         stream: Option<TcpStream>,
+        pub headers: HashMap<String, String>,
         method: Method,
         http_version: String,
     }
@@ -77,11 +79,13 @@ pub mod methods {
             HTTPRequest {
                 stream,
                 method: match method.as_str() {
-                    "GET" => Method::GET(GETData {headers, path}),
-                    "POST" => Method::POST(POSTData {headers, path, body}),
+                    "GET" => Method::GET(GETData {path}),
+                    "POST" => Method::POST(POSTData {path, body}),
                     _ => panic!("Unavailable method")
                 },
-                http_version
+                http_version,
+                headers
+                
             }
         }
 
@@ -93,29 +97,54 @@ pub mod methods {
             self.method.clone()
         }
 
-        pub fn response_json(&mut self, status: HTTPResponse) {
+
+        
+        pub fn response(&mut self, status: HTTPResponse) {
+            enum ResponseType {
+                JSON,
+                HTML,
+                PlainText
+            }
+
             let mut stream = self.stream.as_ref().unwrap();
             let (msg, status_code) = match status {
                 HTTPResponse::OK => ("The request was successful".to_owned(), 200),
                 HTTPResponse::InvalidMethod => ("Invalid HTTP method".to_owned(), 405),
                 HTTPResponse::BadRequest => ("Bad Request".to_owned(), 400)
             };
+            
+            let response: String;
+
+            let (response_type, response_type_str) = if let Some(value) = self.headers.get("Accept") {
+                if value.contains("text/html") {(ResponseType::HTML, "text/html")}
+                else if value.contains("pat") {(ResponseType::JSON, "application/json")}
+                else {(ResponseType::PlainText, "text")}
+            } else {(ResponseType::PlainText, "text")};
+
+            response = match response_type {
+                ResponseType::JSON => {
+                    serde_json::to_string(&json!({"msg": msg,"status_code": status_code}))
+                        .expect("Couldn't convert the object to json")
+                },
+                ResponseType::HTML => {
+                    fs::read_to_string("src/node/static/success.html")
+                        .expect("Couldn't read the file")
+                },
+                ResponseType::PlainText => {
+                    msg
+                },
+            };
+
     
-            let response = json!({
-                "msg": msg,
-                "status_code": status_code
-            });
-    
-            let success_json = serde_json::to_string(&response)
-                .expect("Couldn't convert the object to json");
     
             let response = format!(
                 "HTTP/1.1 200 OK\r\n\
-                Content-Type: application/json\r\n\
+                Content-Type: {}\r\n\
                 Content-Length: {}\r\n
     {}", 
-                success_json.len(),
-                success_json
+                response_type_str,
+                response.len(),
+                response
             );
     
             stream.write_all(response.as_bytes()).unwrap();
