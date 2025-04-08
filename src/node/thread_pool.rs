@@ -1,22 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub mod custom_thread_pool {
     use std::{fmt, sync::{mpsc, Arc, Mutex}, thread};
 

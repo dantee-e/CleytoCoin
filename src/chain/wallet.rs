@@ -1,69 +1,97 @@
-use rsa::{RsaPrivateKey, RsaPublicKey};
-use rsa::pkcs1v15::{SigningKey, VerifyingKey};
-use rsa::signature::{Keypair, RandomizedSigner, Verifier};
-use rsa::pkcs1::EncodeRsaPublicKey;
-use rsa::sha2::Sha256;
+use openssl::error::ErrorStack;
+use serde::{Deserialize, Serialize};
 use super::transaction::TransactionInfo;
 
+use openssl::sign::{Signer, Verifier};
+use openssl::rsa::Rsa;
+use openssl::pkey::{PKey, Private, Public};
+use openssl::hash::MessageDigest;
+
+fn test_sign() {
+    let rsa = Rsa::generate(2048).unwrap();
+    let pkey = PKey::from_rsa(rsa).unwrap();
+
+    // Data to be signed (this would normally be provided by the signer)
+    let data = b"hello, world!";
+
+    // Step 2: Sign the data with the private key (this would be done by the sender)
+    let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
+    signer.update(data).unwrap();
+    let signature = signer.sign_to_vec().unwrap();
+
+    // --- Now, we are at the verification step ---
+    // Step 3: Extract the public key from the PKey and use it for verification
+    let public_key = pkey.public_key_to_pem().unwrap();  // Extract public key in PEM format
+    let rsa_public = Rsa::public_key_from_pem(&public_key).unwrap(); // Convert back to Rsa
+    let pkey_public = PKey::from_rsa(rsa_public).unwrap();  // Create a PKey for public key
+
+    // Step 4: Verify the signature using the public key
+    let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey_public).unwrap();
+    verifier.update(data).unwrap();
+    let is_valid = verifier.verify(&signature).unwrap();
+
+    // Step 5: Check if the signature is valid
+    if is_valid {
+        println!("Signature is valid!");
+    } else {
+        println!("Signature is invalid.");
+    }
+}
 
 // ---------------------------------------------- WalletPK definition ----------------------------------------------
 #[derive(Debug)]
 pub struct WalletPK{
-    #[allow(unused)]
-    private_key: RsaPrivateKey,
-    signing_key: SigningKey<Sha256>
+    private_key: PKey<Private>
 }
 
 impl WalletPK {
-    pub fn sign_transaction(&mut self, transaction_info: &TransactionInfo) -> Result<rsa::pkcs1v15::Signature, rsa::Error>{        
-        let signed_hashed_message = self.signing_key.sign_with_rng(&mut rand::thread_rng(), transaction_info.to_string().as_bytes());
-
-        Ok(signed_hashed_message)
+    pub fn sign_transaction(&mut self, transaction_info: &TransactionInfo) -> Result<Vec<u8>, ErrorStack>{
+        let mut signer = Signer::new(MessageDigest::sha256(), &self.private_key)?;
+        signer.update(transaction_info.to_string().as_bytes())?;
+        Ok(signer.sign_to_vec()?)
     }
 }
 // -----------------------------------------------------------------------------------------------------------------
 
 // ---------------------------------------------- Wallet definition ------------------------------------------------
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Wallet{
-    public_key: RsaPublicKey,
-    verifying_key: VerifyingKey<Sha256>
+    public_key: Vec<u8>
 }
 
 impl Wallet {
     pub fn new() -> (Self, WalletPK) {
-        let bits: usize = 2048;
-        let private_key: RsaPrivateKey = RsaPrivateKey::new(&mut rand::thread_rng(), bits).expect("failed to generate a key");
-        let public_key: RsaPublicKey = RsaPublicKey::from(&private_key);
-        let signing_key: SigningKey<Sha256> = SigningKey::<Sha256>::new(private_key.clone());
-        let verifying_key = signing_key.verifying_key();
-        
+        let bits: u32 = 2048;
+        let rsa = Rsa::generate(bits).unwrap();
+        let private_key = PKey::from_rsa(rsa).unwrap();
+
+        let public_key = private_key.public_key_to_pem().expect("Error extracting public key from private key");
+
         (
             Wallet{
-                public_key,
-                verifying_key
+                public_key
             },
             WalletPK{
-                private_key,
-                signing_key, }
+                private_key
+            }
         )
     }
 
-    pub fn verify_transaction_info(&self, data: &TransactionInfo, signature: &rsa::pkcs1v15::Signature) -> bool {
-        let verified = self.verifying_key.verify(data.to_string().as_bytes(), &signature);
-        match verified {
-            Ok(()) => true,
-            Err(_) => false,
-        }
-    }
+    pub fn verify_transaction_info(&self, transaction_info: &TransactionInfo, signature: &[u8]) -> Result<bool, ErrorStack> {
 
-    pub fn to_string(&self) -> String {
-        self.public_key.to_pkcs1_pem(rsa::pkcs1::LineEnding::LF).unwrap().to_string()
+        let public_key = self.to_pkey();
+        let mut verifier = Verifier::new(MessageDigest::sha256(), &public_key)?;
+        verifier.update(transaction_info.to_string().as_bytes())?;
+        Ok(verifier.verify(&signature)?)
     }
 
     #[allow(unused)]
-    pub fn get_public_key(&self) -> RsaPublicKey {
+    pub fn to_pkey(&self) -> PKey<Public> {
+        let rsa_public = Rsa::public_key_from_pem(&self.public_key).expect("Error extracting Rsa<Public> object from public key");
+        PKey::from_rsa(rsa_public).expect("Error extracting PKey<Public> object from Rsa<Public> object")
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
         self.public_key.clone()
     }
 }
@@ -77,7 +105,7 @@ mod tests {
     #[test] //mark a function as a test.
     fn test_wallet_creation() {
         let (wallet, wallet_pk) = Wallet::new();
-        println!("wallet.to_string: {}", wallet.to_string());
+        println!("wallet.to_string: {:?}", wallet.to_vec());
         println!("{:#?}", wallet);
         println!("{:#?}", wallet_pk);
     }

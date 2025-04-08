@@ -15,13 +15,13 @@ fn create_transaction() {
     println!("Transaction signature (signed using the wallet_pk):\n{:?}", signature);
 
     // this will also be verified by the Transaction::new();
-    if wallet_sender.verify_transaction_info(&transactioninfo, &signature) == true {
+    if wallet_sender.verify_transaction_info(&transactioninfo, &signature).unwrap() == true {
         println!("transaction verified (by the wallet)");
     } else {
         println!("transaction not verified");
     }
 
-    let transaction: Transaction = Transaction::new(wallet_sender, wallet_receiver, transactioninfo, signature);
+    let transaction: Transaction = Transaction::new(wallet_sender, wallet_receiver, transactioninfo, signature).unwrap();
 
     println!("transaction.to_string(): {}", transaction.to_string());
 }

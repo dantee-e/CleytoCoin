@@ -13,7 +13,7 @@ fn create_block_and_add_chain() {
         Err(e) => panic!("Error creating signed message: {e}"),
     };
 
-    let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature);
+    let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature).unwrap();
 
     let mut chain = Chain::new();
 

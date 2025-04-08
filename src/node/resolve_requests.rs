@@ -1,8 +1,8 @@
 
 pub mod endpoints {
+    use crate::chain::transaction::Transaction;
+
     use super::methods::{HTTPRequest, HTTPResponse, Method};
-
-
 
     fn path_not_found(){
 
@@ -11,6 +11,16 @@ pub mod endpoints {
     fn index(mut request: HTTPRequest){
 
         request.response(HTTPResponse::OK);
+    }
+
+    fn submit_transaction(mut request: HTTPRequest){
+        match request.get_method() {
+            Method::GET(_) => request.response(HTTPResponse::InvalidMethod),
+            Method::POST(data) => {
+                let json: Transaction = serde_json::from_str(&data.body.unwrap()).unwrap();
+                println!("{}", json.to_string());
+            }
+        }
     }
 
 
@@ -127,8 +137,12 @@ pub mod methods {
                         .expect("Couldn't convert the object to json")
                 },
                 ResponseType::HTML => {
-                    fs::read_to_string("src/node/static/success.html")
-                        .expect("Couldn't read the file")
+                    match status {
+                        HTTPResponse::OK => fs::read_to_string("src/node/static/200.html").expect("Couldn't read the file"),
+                        HTTPResponse::InvalidMethod => fs::read_to_string("src/node/static/405.html").expect("Couldn't read the file"),
+                        HTTPResponse::BadRequest => fs::read_to_string("src/node/static/400.html").expect("Couldn't read the file"),
+                    }
+                    
                 },
                 ResponseType::PlainText => {
                     msg

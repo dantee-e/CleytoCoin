@@ -12,7 +12,7 @@ fn sign_and_verify_transactioninfo() {
     };
     println!("Transaction signature (signed using the wallet_pk):\n{:?}", signature);
 
-    if wallet.verify_transaction_info(&transactioninfo, &signature) == true {
+    if wallet.verify_transaction_info(&transactioninfo, &signature).unwrap() == true {
         println!("transaction verified (by the wallet)");
     } else {
         println!("transaction not verified");
