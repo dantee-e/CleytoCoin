@@ -78,7 +78,6 @@ impl Wallet {
     }
 
     pub fn verify_transaction_info(&self, transaction_info: &TransactionInfo, signature: &[u8]) -> Result<bool, ErrorStack> {
-
         let public_key = self.to_pkey();
         let mut verifier = Verifier::new(MessageDigest::sha256(), &public_key)?;
         verifier.update(transaction_info.to_string().as_bytes())?;
@@ -91,9 +90,8 @@ impl Wallet {
         PKey::from_rsa(rsa_public).expect("Error extracting PKey<Public> object from Rsa<Public> object")
     }
 
-    pub fn to_vec(&self) -> Vec<u8> {
-        self.public_key.clone()
-    }
+    pub fn to_vec(&self) -> Vec<u8> { self.public_key.clone() }
+
 }
 // -----------------------------------------------------------------------------------------------------------------
 

@@ -2,16 +2,15 @@ mod utils;
 mod resolve_requests;
 mod thread_pool;
 
+
 use core::panic;
 use std::time::Duration;
 use resolve_requests::{
     methods::{return_json, HTTPParseError, HTTPRequest, HTTPResponse},
     endpoints::resolve_endpoint
 };
-use crate::chain::transaction::Transaction;
+use crate::chain::{transaction::Transaction, Chain};
 use thread_pool::custom_thread_pool::ThreadPool;
-
-
 
 use std::{
     collections::HashMap, io::{prelude::*, BufReader}, net::{TcpListener, TcpStream}, sync::{mpsc::Receiver, Arc, Mutex}, thread
@@ -22,10 +21,13 @@ use std::{
 
 
 pub struct Node {
+    chain: Chain,
     transactions_list: Vec<Transaction>
 }
 
 use once_cell::sync::Lazy;
+
+
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 
 impl Node {
@@ -34,10 +36,11 @@ impl Node {
     pub const DEFAULT_PORT: u16 = 9473;
     pub const REFRESH_RATE_SERVER_IN_MS: u64 = 50;
 
-    pub fn new(port: u16) -> Node {
+    pub fn new(chain: Chain) -> Node {
         num_cpus::get();
     
         Node {
+            chain,
             transactions_list: Vec::new()
         }
     }
