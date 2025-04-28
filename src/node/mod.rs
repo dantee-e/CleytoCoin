@@ -1,7 +1,7 @@
 mod utils;
 mod resolve_requests;
 mod thread_pool;
-
+pub mod ui;
 
 use core::panic;
 use std::time::Duration;
@@ -31,14 +31,14 @@ use once_cell::sync::Lazy;
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 
 impl Node {
-    
+
     // these configurations should be moved to a file
     pub const DEFAULT_PORT: u16 = 9473;
     pub const REFRESH_RATE_SERVER_IN_MS: u64 = 50;
 
     pub fn new(chain: Chain) -> Node {
         num_cpus::get();
-    
+
         Node {
             chain,
             transactions_list: Vec::new()
@@ -56,7 +56,7 @@ impl Node {
 
         // reading status_line
         let status_line: String;
-        
+
         match buf_reader.read_line(&mut line) {
             Ok(n) if (n > 0) => n,
             Ok(_) => return Err(HTTPParseError::InvalidStatusLine),
@@ -68,7 +68,7 @@ impl Node {
         let mut tokens =  status_line.split(' ');
         let (method, path, http_version) = (
             tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string(),
-            tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string(), 
+            tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string(),
             tokens.next().ok_or(HTTPParseError::InvalidRequestLine)?.to_string()
         );
 
@@ -76,25 +76,25 @@ impl Node {
         loop {
             line.clear();
 
-            if let Err(e) = buf_reader.read_line(&mut line) {
+            if let Err(_) = buf_reader.read_line(&mut line) {
                 return Err(HTTPParseError::InvalidRequestLine);
             }
 
             let line = line.trim_end().to_string();
-            
-        
+
+
             if line.is_empty() {
                 break;
             }
-            
+
             if let Some((key, value)) = line.split_once(":") {
                 http_headers.insert(key.trim().to_string(), value.trim().to_string());
             } else {
                 return Err(HTTPParseError::InvalidRequestLine);
             };
-        
+
         }
-        
+
         // If method is GET, return before trying to read the body
         if method == "GET" {
             return Ok(HTTPRequest::new(None, method, path, http_version, http_headers, None))
@@ -131,13 +131,13 @@ impl Node {
             return Ok(HTTPRequest::new(None, method, path, http_version, http_headers, http_body))
         }
 
-        Err(HTTPParseError::InvalidStatusLine)        
+        Err(HTTPParseError::InvalidStatusLine)
     }
 
     fn handle_connection(stream: TcpStream){
         let buf_reader = BufReader::new(&stream);
-        
-        
+
+
         let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {
             Ok(value) => value,
             Err(e) => {
@@ -153,16 +153,16 @@ impl Node {
         resolve_endpoint(request_object);
 
         return;
-         
+
 
     }
 
     pub fn run(default: bool, rx: Arc<Mutex<Receiver<()>>>, selected_port: u16) {
         let port: u16;
         if default == true {
-            port = Self::DEFAULT_PORT; 
+            port = Self::DEFAULT_PORT;
         }
-        
+
         else {
             port = match selected_port {
                 port if (1..=65535).contains(&port) => port,
@@ -172,7 +172,7 @@ impl Node {
                 }
             }
         }
-        
+
 
         let listener = TcpListener::bind(format!("127.0.0.1:{port}")).unwrap();
 
@@ -183,7 +183,7 @@ impl Node {
             Err(e) => panic!("{e}"),
         };
 
-        
+
 
         loop {
             // Check for termination signal
@@ -195,7 +195,7 @@ impl Node {
 
             // Try accepting a connection
             match listener.accept() {
-                Ok((stream, addr)) => {
+                Ok((stream, _)) => {
                     // rayon
                     thread_pool.execute(|| {
                         Self::handle_connection(stream);
@@ -209,10 +209,12 @@ impl Node {
                     break;
                 }
             }
-        }  
+        }
 
         println!("Dropping thread pool");
 
         drop(thread_pool);
     }
 }
+
+

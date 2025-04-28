@@ -3,19 +3,25 @@ name = "cleyto_coin"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "node"
+test = false
+bench = false
+
+
+
 [dependencies]
 sha2 = "0.10"
-rsa = {version = "0.9.8", features = ["sha2", "serde"]}
 rand = "0.9.0"
 hex = "0.4.3"
-tiny-bip39 = "2.0.0"
 chrono = { version="0.4.40", features = ["serde"] }
 serde = { version="1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 reqwest = { version = "0.12.15", features = ["blocking", "json"] }
 num_cpus = "1.16.0"
 once_cell = "1.21.3"
-serde_bytes = "0.11.17"
-smallvec = { version="1.14.0", features = ["serde"] }
 openssl = "0.10.71"
+crossterm = "0.29"
+ratatui = "0.29.0"
+color-eyre = "0.6.3"
 
