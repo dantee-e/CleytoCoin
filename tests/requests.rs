@@ -4,7 +4,8 @@ use std::{sync::{mpsc, Arc, Mutex}, thread};
 use reqwest::blocking::Client;
 use serde::Serialize;
 use rand::Rng;
-
+use cleyto_coin::chain::Chain;
+use cleyto_coin::node::logger::Logger;
 
 #[derive(Serialize)]
 struct RandomData {
@@ -146,7 +147,8 @@ fn main(){
     // Run server thread
     let server = thread::spawn(move || {
         let rx = Arc::clone(&rx);
-        node::Node::run(true, rx, 0);
+        let mut node = node::Node::new(Chain::new(), Arc::new(Logger::new()));
+        node.run(true, rx, 0);
     });
 
 

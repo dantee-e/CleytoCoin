@@ -1,4 +1,4 @@
-
+use super::logger;
 pub mod custom_thread_pool {
     use std::{fmt, sync::{mpsc, Arc, Mutex}, thread};
 
@@ -33,7 +33,6 @@ pub mod custom_thread_pool {
 
                 match message {
                     Ok(job) => {
-                        println!("Worker {id} got a job; executing.");
                         job();
                     }
                     Err(_) => {

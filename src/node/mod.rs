@@ -2,7 +2,9 @@ mod utils;
 mod resolve_requests;
 mod thread_pool;
 pub mod ui;
+pub mod logger;
 
+use std::fmt::Error;
 use core::panic;
 use std::time::Duration;
 use resolve_requests::{
@@ -22,11 +24,12 @@ use std::{
 
 pub struct Node {
     chain: Chain,
-    transactions_list: Vec<Transaction>
+    transactions_list: Vec<Transaction>,
+    logger: Arc<logger::Logger>,
 }
 
 use once_cell::sync::Lazy;
-
+use crate::node::logger::Logger;
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 
@@ -36,12 +39,13 @@ impl Node {
     pub const DEFAULT_PORT: u16 = 9473;
     pub const REFRESH_RATE_SERVER_IN_MS: u64 = 50;
 
-    pub fn new(chain: Chain) -> Node {
+    pub fn new(chain: Chain, logger: Arc<Logger>) -> Node {
         num_cpus::get();
 
         Node {
             chain,
-            transactions_list: Vec::new()
+            transactions_list: Vec::new(),
+            logger
         }
     }
 
@@ -134,8 +138,10 @@ impl Node {
         Err(HTTPParseError::InvalidStatusLine)
     }
 
-    fn handle_connection(stream: TcpStream){
+    fn handle_connection(stream: TcpStream) -> Result<String, String>{
+
         let buf_reader = BufReader::new(&stream);
+
 
 
         let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {
@@ -143,21 +149,19 @@ impl Node {
             Err(e) => {
                 println!("Error processing HTTP request: {e}");
                 return_json(&stream, HTTPResponse::BadRequest);
-                return;
+                return Err("Error processing HTTP request: {e}".parse().unwrap());
             },
         };
 
         request_object.set_stream(stream);
 
 
-        resolve_endpoint(request_object);
-
-        return;
+        resolve_endpoint(request_object)
 
 
     }
 
-    pub fn run(default: bool, rx: Arc<Mutex<Receiver<()>>>, selected_port: u16) {
+    pub fn run(&mut self, default: bool, rx: Arc<Mutex<Receiver<()>>>, selected_port: u16) {
         let port: u16;
         if default == true {
             port = Self::DEFAULT_PORT;
@@ -196,9 +200,12 @@ impl Node {
             // Try accepting a connection
             match listener.accept() {
                 Ok((stream, _)) => {
-                    // rayon
-                    thread_pool.execute(|| {
-                        Self::handle_connection(stream);
+                    let logger = Arc::clone(&self.logger);
+                    thread_pool.execute(move || {
+                        match Self::handle_connection(stream) {
+                            Ok(value) => logger.log(format!("{value}")),
+                            Err(value) => logger.log_error(format!("{value}"))
+                        };
                     })
                 },
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {

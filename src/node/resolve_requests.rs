@@ -1,36 +1,59 @@
 
+
+
 pub mod endpoints {
     use crate::chain::transaction::Transaction;
 
     use super::methods::{HTTPRequest, HTTPResponse, Method};
 
-    fn path_not_found(){
-
+    fn path_not_found() -> Result<String, String>{
+        Err(String::from("Someone tried to access a nonexistent path"))
     }
 
-    fn index(mut request: HTTPRequest){
+    fn index(mut request: HTTPRequest) -> Result<String, String> {
 
         request.response(HTTPResponse::OK);
+        Ok(String::from("Index.html returned to client"))
     }
 
-    fn submit_transaction(mut request: HTTPRequest){
-        match request.get_method() {
-            Method::GET(_) => request.response(HTTPResponse::InvalidMethod),
-            Method::POST(data) => {
-                let json: Transaction = serde_json::from_str(&data.body.unwrap()).unwrap();
-                println!("{}", json.to_string());
-            }
+    fn submit_transaction(mut request: HTTPRequest) -> Result<String, String> {
+        if let Method::GET(_) = request.get_method() {
+            request.response(HTTPResponse::InvalidMethod);
+            return Err(String::from("Method not supported on function submit_transaction"));
+        }
+
+        if let Method::POST(data) = request.get_method() {
+            let json: Transaction = match serde_json::from_str(&data.body.unwrap()){
+                Ok(json) => json,
+                Err(_) => {
+                    request.response(HTTPResponse::BadRequest);
+                    return Err(String::from("Error extracting transaction from POST").to_string());
+                }
+
+            };
+            request.response(HTTPResponse::OK);
+            return Ok(format!("Received transaction: {}", json.to_string()))
+        }
+
+        Err(String::from("Something went wrong on the submit_transaction function"))
+
+    }
+
+    fn favicon(mut request: HTTPRequest) -> Result<String, String> {
+        if let Method::GET(_) = request.get_method() {
+            // TODO implement the happy path
+            return Err(String::from("Favicon"));
         }
     }
 
-
-    pub fn resolve_endpoint(request: HTTPRequest){
-
+    pub fn resolve_endpoint(request: HTTPRequest) -> Result<String, String> {
         match request.get_method() {
             Method::GET(data) => {
                 match data.path.as_str() {
                     "/" => index(request),
+                    "/favicon.ico" => favicon(request),
                     _ => path_not_found(),
+
                 }
             },
             Method::POST(data) => {
@@ -40,6 +63,7 @@ pub mod endpoints {
                 }
             },
         }
+
     }
 }
 
@@ -51,10 +75,18 @@ pub mod methods {
     use std::io::prelude::*;
     use serde_json::json;
 
+
+    pub enum Content {
+        HTML(String),    // path to HTML file
+        JSON(serde_json::Value),
+        Image(String),   // path to image file
+        PlainText(String),
+    }
     pub enum HTTPResponse {
-        OK,
+        OK(Option<Content>),
         InvalidMethod,
-        BadRequest
+        BadRequest,
+        Favicon
     }
 
 
@@ -84,6 +116,42 @@ pub mod methods {
         http_version: String,
     }
 
+    struct Response {
+        status: u16,
+        content_type: &'static str,
+        body: Vec<u8>,
+    }
+
+    impl Response {
+        fn to_bytes(&self) -> Vec<u8> {
+            let mut v = Vec::new();
+            let header = format!(
+                "HTTP/1.1 {} {}\r\n\
+                 Content-Type: {}\r\n\
+                 Content-Length: {}\r\n\r\n",
+                self.status,
+                match self.status {
+                    200 => "OK",
+                    400 => "Bad Request",
+                    405 => "Method Not Allowed",
+                    _   => "Unknown",
+                },
+                self.content_type,
+                self.body.len(),
+            );
+            v.extend_from_slice(header.as_bytes());
+            v.extend_from_slice(&self.body);
+            v
+        }
+        fn new(status: u16, content_type: &'static str, body: Vec<u8>) -> Self {
+            Self {
+                status,
+                content_type,
+                body
+            }
+        }
+    }
+
     impl HTTPRequest {
         pub fn new(stream: Option<TcpStream>, method: String, path: String, http_version: String, headers: HashMap<String, String>, body: Option<String>) -> HTTPRequest {
             HTTPRequest {
@@ -99,69 +167,85 @@ pub mod methods {
             }
         }
 
-        pub fn set_stream(&mut self, stream: TcpStream) {
-            self.stream = Some(stream);
-        }
+        pub fn set_stream(&mut self, stream: TcpStream) { self.stream = Some(stream) }
 
-        pub fn get_method(&self) -> Method {
-            self.method.clone()
-        }
+        pub fn get_method(&self) -> Method { self.method.clone() }
 
 
-        
-        pub fn response(&mut self, status: HTTPResponse) {
-            enum ResponseType {
-                JSON,
-                HTML,
-                PlainText
+
+        fn make_response(status: HTTPResponse, accept: Option<&str>) -> std::io::Result<Response> {
+
+            fn response_ok_content(content: Content) -> std::io::Result<Response> {
+                match content {
+                    Content::HTML(path) => Ok(Response {
+                        status: 200,
+                        content_type: "text/html",
+                        body: fs::read(path)?,
+                    }),
+                    Content::JSON(value) => Ok(Response {
+                        status: 200,
+                        content_type: "application/json",
+                        body: serde_json::to_vec(&value)?,
+                    }),
+                    Content::Image(path) => Ok(Response {
+                        status: 200,
+                        content_type: "image/png",
+                        body: fs::read(path)?,
+                    }),
+                    Content::PlainText(text) => Ok(Response {
+                        status: 200,
+                        content_type: "text/plain",
+                        body: text.into_bytes(),
+                    }),
+                }
+            }
+            fn response_ok_no_content(a: &str) -> std::io::Result<Response> {
+                if a.contains("text/html") {
+                    return Ok(Response::new(200, "text/html", fs::read("static/200.html").unwrap_or("NOT FOUND".into())));
+                }
+                
+                else if a.contains("application/json") {
+                    let j = json!({ "msg": "OK", "status": 200 });
+                    return Ok(Response::new(200, "application/json", serde_json::to_vec(&j)?))
+                }
+                
+                Ok(Response::new(200, "text", "Success".into()))
             }
 
-            let mut stream = self.stream.as_ref().unwrap();
-            let (msg, status_code) = match status {
-                HTTPResponse::OK => ("The request was successful".to_owned(), 200),
-                HTTPResponse::InvalidMethod => ("Invalid HTTP method".to_owned(), 405),
-                HTTPResponse::BadRequest => ("Bad Request".to_owned(), 400)
-            };
-            
-            let response: String;
-
-            let (response_type, response_type_str) = if let Some(value) = self.headers.get("Accept") {
-                if value.contains("text/html") {(ResponseType::HTML, "text/html")}
-                else if value.contains("pat") {(ResponseType::JSON, "application/json")}
-                else {(ResponseType::PlainText, "text")}
-            } else {(ResponseType::PlainText, "text")};
-
-            response = match response_type {
-                ResponseType::JSON => {
-                    serde_json::to_string(&json!({"msg": msg,"status_code": status_code}))
-                        .expect("Couldn't convert the object to json")
-                },
-                ResponseType::HTML => {
-                    match status {
-                        HTTPResponse::OK => fs::read_to_string("src/node/static/200.html").expect("Couldn't read the file"),
-                        HTTPResponse::InvalidMethod => fs::read_to_string("src/node/static/405.html").expect("Couldn't read the file"),
-                        HTTPResponse::BadRequest => fs::read_to_string("src/node/static/400.html").expect("Couldn't read the file"),
+            match status {
+                HTTPResponse::OK(content_opt) => {
+                    if let Some(content) = content_opt {
+                        response_ok_content(content)
+                    } else {
+                        response_ok_no_content(accept.unwrap_or("text"))
                     }
-                    
-                },
-                ResponseType::PlainText => {
-                    msg
-                },
-            };
+                }
+                HTTPResponse::InvalidMethod => {
+                    if accept.unwrap_or("").contains("text/html") {
+                        Ok(Response::new(405, "text/html", fs::read("static/405.html").unwrap_or_else(|_| b"405 Invalid Method".to_vec())))
+                    } else {
+                        Ok(Response::new(405, "text/plain", b"405 Invalid Method".to_vec()))
+                    }
+                }
+                HTTPResponse::BadRequest => {
+                    if accept.unwrap_or("").contains("text/html") {
+                        Ok(Response::new(400, "text/html", fs::read("static/400.html").unwrap_or_else(|_| b"400 Bad Request".to_vec())))
+                    } else {
+                        Ok(Response::new(400, "text/plain", b"400 Bad Request".to_vec()))
+                    }
+                }
+                HTTPResponse::Favicon => {
+                    Ok(Response::new(200, "image/x-icon", fs::read("static/favicon.ico").unwrap_or_else(|_| b"".to_vec())))
+                }
+            }.expect("TODO: panic message");
 
-    
-    
-            let response = format!(
-                "HTTP/1.1 200 OK\r\n\
-                Content-Type: {}\r\n\
-                Content-Length: {}\r\n
-    {}", 
-                response_type_str,
-                response.len(),
-                response
-            );
-    
-            stream.write_all(response.as_bytes()).unwrap();
+            Ok(Response::new(500, "text/html", fs::read("static/500.html").unwrap_or_else(|_| b"500 Internal Server Error".to_vec())))
+        }
+        
+        pub fn response(&mut self, status: HTTPResponse) -> std::io::Result<()> {
+            let accept = self.headers.get("Accept").map(|s| s.as_str());
+            let resp = Self::make_response(status, accept)?;
+            self.stream.as_mut().unwrap().write_all(&resp.to_bytes())
         }
     }
 
