@@ -1,22 +1,19 @@
-pub mod utils;
-pub mod transaction;
 pub mod block;
+pub mod transaction;
+pub mod utils;
 pub mod wallet;
 use block::Block;
 
 pub struct Chain {
-    blocks: Vec<block::Block>
+    blocks: Vec<block::Block>,
 }
 
 impl Chain {
-
     pub fn new() -> Self {
-        Self{
-            blocks: Vec::new()
-        }
+        Self { blocks: Vec::new() }
     }
 
-    pub fn add_block(&mut self, block: Block){
+    pub fn add_block(&mut self, block: Block) {
         self.blocks.push(block);
     }
 
@@ -32,17 +29,17 @@ impl Chain {
             None => {
                 let genesis_block = self.create_genesis_block();
                 genesis_block.get_hash()
-            },
+            }
         }
     }
 
     fn get_last_index(&mut self) -> u64 {
         match self.blocks.last() {
             Some(block) => block.get_index(),
-            None =>{
+            None => {
                 let genesis_block = self.create_genesis_block();
                 genesis_block.get_index()
-            },
+            }
         }
     }
 }

@@ -1,7 +1,6 @@
 // use serde::{Deserialize, Serialize};
 
-
-/* 
+/*
 pub const RESPONSES_FOLDER: &str = "src/node/responses/";
 pub const SUCCESS_FILE_JSON: &str = "sucess_response.json";
 pub const ERROR_FILE_JSON: &str = "error_response.json";

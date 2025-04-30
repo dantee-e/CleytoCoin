@@ -1,29 +1,33 @@
-use super::logger;
 pub mod custom_thread_pool {
-    use std::{fmt, sync::{mpsc, Arc, Mutex}, thread};
+    use std::{
+        fmt,
+        sync::{mpsc, Arc, Mutex},
+        thread,
+    };
 
     #[derive(Debug)]
     pub enum PoolCreationError {
         TooFewThreads,
-        TooManyThreads
+        TooManyThreads,
     }
 
     impl fmt::Display for PoolCreationError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
-                PoolCreationError::TooFewThreads => write!(f, "You must use at least one thread on the pool"),
-                PoolCreationError::TooManyThreads => write!(f, "You must use less than {} threads on the pool", u32::MAX),
+                PoolCreationError::TooFewThreads => {
+                    write!(f, "You must use at least one thread on the pool")
+                }
+                PoolCreationError::TooManyThreads => {
+                    write!(f, "You must use less than {} threads on the pool", u32::MAX)
+                }
             }
         }
     }
     impl std::error::Error for PoolCreationError {}
 
-
-
-
     struct Worker {
         id: usize,
-        handle: thread::JoinHandle<()>
+        handle: thread::JoinHandle<()>,
     }
 
     impl Worker {
@@ -41,19 +45,15 @@ pub mod custom_thread_pool {
                     }
                 }
             });
-            Worker {
-                id,
-                handle: thread
-            }
+            Worker { id, handle: thread }
         }
     }
-
 
     type Job = Box<dyn FnOnce() + Send + 'static>;
 
     pub struct ThreadPool {
         workers: Vec<Worker>,
-        sender: Option<mpsc::Sender<Job>>
+        sender: Option<mpsc::Sender<Job>>,
     }
 
     impl ThreadPool {
@@ -66,9 +66,10 @@ pub mod custom_thread_pool {
         /// The `new` function will panic if the size is zero.
         pub fn new(size: usize) -> Result<ThreadPool, PoolCreationError> {
             if size < 1 {
-                return Err(PoolCreationError::TooFewThreads)
-            } else if size > usize::MAX { // I think this is unreachable
-                return Err(PoolCreationError::TooManyThreads)
+                return Err(PoolCreationError::TooFewThreads);
+            } else if size > usize::MAX {
+                // I think this is unreachable
+                return Err(PoolCreationError::TooManyThreads);
             }
 
             let (sender, receiver) = mpsc::channel();
@@ -81,7 +82,10 @@ pub mod custom_thread_pool {
                 workers.push(Worker::new(id, Arc::clone(&receiver)));
             }
 
-            Ok(ThreadPool { workers, sender: Some(sender) })
+            Ok(ThreadPool {
+                workers,
+                sender: Some(sender),
+            })
         }
 
         /// Receives a closure compatible with the thread::spawn() function.
@@ -97,14 +101,13 @@ pub mod custom_thread_pool {
     impl Drop for ThreadPool {
         fn drop(&mut self) {
             println!("Dropping threadPool");
-    
+
             drop(self.sender.take());
-    
+
             for worker in self.workers.drain(..) {
                 println!("Shutting down worker {}", worker.id);
                 worker.handle.join().unwrap();
             }
         }
     }
-    
 }

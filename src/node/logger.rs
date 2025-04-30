@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self};
 use std::sync::Mutex;
 
 pub struct Logger {
@@ -22,12 +22,12 @@ impl Logger {
         }
     }
 
-     fn log_internal(&self, log: String) { 
+    fn log_internal(&self, log: String) {
         let mut logs = self.logs.lock().unwrap(); // Lock the Mutex to modify the logs
         logs.push(log);
-        
+
         if let Err(e) = std::fs::write("/tmp/foo", logs.join("\n").as_bytes()) {
-         eprintln!("Unable to write to log file: {e}");
+            eprintln!("Unable to write to log file: {e}");
         }
     }
     pub fn log_error(&self, log: String) {
@@ -38,7 +38,6 @@ impl Logger {
         self.log_internal(format!("[LOG] {}", log));
         self.temp_log(format!("[LOG] {}", log));
     }
-
 
     pub fn read_logs(&self) -> io::Result<Vec<String>> {
         let logs = self.logs.lock().unwrap();

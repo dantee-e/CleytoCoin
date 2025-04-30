@@ -1,23 +1,18 @@
-use std::{sync::{mpsc, Arc, Mutex}, thread};
 use cleyto_coin::chain::Chain;
-use cleyto_coin::node::{
-    self,
-    ui::App,
-    logger::Logger
+use cleyto_coin::node::{self, logger::Logger, ui::App};
+use std::{
+    sync::{mpsc, Arc, Mutex},
+    thread,
 };
 
-
-
 fn main() -> color_eyre::Result<()> {
-
     let logger = Arc::new(Logger::new());
 
     let (tx, rx) = mpsc::channel::<()>();
 
     // Channel to kill thread
     let rx = Arc::new(Mutex::new(rx));
-    
-    
+
     // Run server thread
     let logger_clone_for_node = Arc::clone(&logger);
     let server = thread::spawn(move || {
@@ -25,7 +20,6 @@ fn main() -> color_eyre::Result<()> {
         let mut node = node::Node::new(Chain::new(), logger_clone_for_node);
         node.run(true, rx, 0);
     });
-
 
     color_eyre::install()?;
     let terminal = ratatui::init();

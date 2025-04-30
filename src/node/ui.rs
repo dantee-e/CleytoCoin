@@ -1,14 +1,14 @@
-use std::sync::Arc;
+use crate::node::logger::Logger;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
-    DefaultTerminal, Frame,
+    prelude::*,
     style::Stylize,
     text::Line,
     widgets::{Block, Paragraph},
-    prelude::*
+    DefaultTerminal, Frame,
 };
-use crate::node::logger::Logger;
+use std::sync::Arc;
 
 /// The main application which holds the state and logic of the application.
 
@@ -16,7 +16,7 @@ pub struct App {
     /// Is the application running?
     running: bool,
     port: u16,
-    logger: Arc<Logger>
+    logger: Arc<Logger>,
 }
 
 impl App {
@@ -25,7 +25,7 @@ impl App {
         Self {
             running: true,
             port,
-            logger
+            logger,
         }
     }
 
@@ -42,24 +42,19 @@ impl App {
     fn render(&mut self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ])
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(frame.area());
 
         let main_title = Line::from(" CleytoCoin node is running! ")
             .bold()
             .blue()
             .centered();
-        let logs_title = Line::from(" LOGS ")
-            .bold()
-            .blue()
-            .centered();
+        let logs_title = Line::from(" LOGS ").bold().blue().centered();
         let port = self.port;
-        let text = format!("Node running in port {port}
-            \n\nPress `Esc`, `Ctrl-C` or `q` to stop running.");
-
+        let text = format!(
+            "Node running in port {port}
+            \n\nPress `Esc`, `Ctrl-C` or `q` to stop running."
+        );
 
         frame.render_widget(
             Paragraph::new(text)
@@ -75,7 +70,6 @@ impl App {
         )
     }
 
-
     fn handle_crossterm_events(&mut self) -> Result<()> {
         match event::read()? {
             // it's important to check KeyEventKind::Press to avoid handling key release events
@@ -87,7 +81,6 @@ impl App {
         Ok(())
     }
 
-
     fn on_key_event(&mut self, key: KeyEvent) {
         match (key.modifiers, key.code) {
             (_, KeyCode::Esc | KeyCode::Char('q'))
@@ -96,7 +89,6 @@ impl App {
             _ => {}
         }
     }
-
 
     fn quit(&mut self) {
         self.running = false;

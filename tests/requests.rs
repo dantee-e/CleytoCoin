@@ -1,11 +1,14 @@
 use cleyto_coin::node;
-use std::{sync::{mpsc, Arc, Mutex}, thread};
+use std::{
+    sync::{mpsc, Arc, Mutex},
+    thread,
+};
 
-use reqwest::blocking::Client;
-use serde::Serialize;
-use rand::Rng;
 use cleyto_coin::chain::Chain;
 use cleyto_coin::node::logger::Logger;
+use rand::Rng;
+use reqwest::blocking::Client;
+use serde::Serialize;
 
 #[derive(Serialize)]
 struct RandomData {
@@ -16,7 +19,9 @@ struct RandomData {
 fn post_request() -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::rng();
     let data = RandomData {
-        message: (0..10).map(|_| rng.sample(rand::distr::Alphanumeric) as char).collect(),
+        message: (0..10)
+            .map(|_| rng.sample(rand::distr::Alphanumeric) as char)
+            .collect(),
         value: rng.random_range(1..=1000),
     };
 
@@ -27,12 +32,11 @@ fn post_request() -> Result<(), Box<dyn std::error::Error>> {
         .send()?;
 
     assert_eq!(res.status(), 200);
-    
+
     Ok(())
 }
 
 fn get_request() -> Result<(), Box<dyn std::error::Error>> {
-
     let client = Client::new();
     let res = client
         .get(format!("http://localhost:{}", node::Node::DEFAULT_PORT))
@@ -44,7 +48,7 @@ fn get_request() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn post_and_get_request(){
+fn post_and_get_request() {
     /* let (tx, rx) = mpsc::channel::<()>();
 
     // Channel to kill thread
@@ -66,7 +70,6 @@ fn post_and_get_request(){
             Err(_) => println!("Get failed"),
         };
     }
-    
 
     /* tx.send(()).expect("Failed to send termination signal.");
 
@@ -74,7 +77,7 @@ fn post_and_get_request(){
     server.join().expect("Server thread panicked."); */
 }
 
-fn thread_post(){
+fn thread_post() {
     let url = "http://localhost:9473/"; // Replace with your server URL
     let client = Client::new();
 
@@ -87,13 +90,16 @@ fn thread_post(){
         let handle = thread::spawn(move || {
             let body = format!(r#"{{"message": "Hello #{}"}}"#, i);
 
-            match client.post(&url)
+            match client
+                .post(&url)
                 .header("Content-Type", "application/json")
                 .body(body)
                 .send()
             {
-                
-                Ok(resp) => {assert_eq!(resp.status(), 200);println!("Thread #{i}: {}", resp.status())},
+                Ok(resp) => {
+                    assert_eq!(resp.status(), 200);
+                    println!("Thread #{i}: {}", resp.status())
+                }
                 Err(err) => eprintln!("Thread #{i} failed: {err}"),
             }
         });
@@ -106,7 +112,7 @@ fn thread_post(){
     }
 }
 
-fn thread_get(){
+fn thread_get() {
     let url = "http://localhost:9473/"; // Replace with your server URL
     let client = Client::new();
 
@@ -119,12 +125,15 @@ fn thread_get(){
         let handle = thread::spawn(move || {
             let body = format!(r#"{{"message": "Hello #{}"}}"#, i);
 
-            match client.get(&url)
+            match client
+                .get(&url)
                 .header("Content-Type", "application/json")
                 .send()
             {
-                
-                Ok(resp) => {assert_eq!(resp.status(), 200);println!("Thread #{i}: {}", resp.status())},
+                Ok(resp) => {
+                    assert_eq!(resp.status(), 200);
+                    println!("Thread #{i}: {}", resp.status())
+                }
                 Err(err) => eprintln!("Thread #{i} failed: {err}"),
             }
         });
@@ -138,7 +147,7 @@ fn thread_get(){
 }
 
 #[test]
-fn main(){
+fn main() {
     let (tx, rx) = mpsc::channel::<()>();
 
     // Channel to kill thread
@@ -151,10 +160,8 @@ fn main(){
         node.run(true, rx, 0);
     });
 
-
     thread_post();
     thread_get();
-
 
     tx.send(()).expect("Failed to send termination signal.");
 

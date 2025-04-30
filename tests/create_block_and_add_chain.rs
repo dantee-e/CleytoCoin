@@ -1,5 +1,10 @@
-use cleyto_coin::chain::{Chain, wallet::Wallet, block::Block, transaction::{Transaction, TransactionInfo}};
 use chrono::Utc;
+use cleyto_coin::chain::{
+    block::Block,
+    transaction::{Transaction, TransactionInfo},
+    wallet::Wallet,
+    Chain,
+};
 
 #[test]
 fn create_block_and_add_chain() {

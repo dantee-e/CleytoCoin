@@ -1,28 +1,21 @@
+use super::wallet::Wallet;
+use chrono::{DateTime, Utc};
 use core::panic;
+use openssl::error::ErrorStack;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Debug;
-use super::wallet::Wallet;
-use openssl::error::{Error, ErrorStack};
-use openssl::sign::{Signer, Verifier};
-use openssl::rsa::Rsa;
-use openssl::pkey::PKey;
-use openssl::hash::MessageDigest;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 // ---------------------------------------------- TransactionInfo definition ----------------------------------------
 pub struct TransactionInfo {
     pub value: f32,
-    pub date: DateTime<Utc>
+    pub date: DateTime<Utc>,
 }
 
 impl TransactionInfo {
     pub fn new(value: f32, date: DateTime<Utc>) -> TransactionInfo {
-        Self {
-            value,
-            date
-        }
+        Self { value, date }
     }
 
     pub fn to_string(&self) -> String {
@@ -59,7 +52,7 @@ impl fmt::Display for TransactionDeserializeError {
 }
 impl std::error::Error for TransactionDeserializeError {}
 
-/* 
+/*
 mod signature_def {
     use rsa::BigUint;
     use serde::{Deserialize, Serialize};
@@ -83,7 +76,6 @@ mod signature_def {
     }
 } */
 
-
 // -----------------------------------------------------------------------------------------------------------------
 
 // ---------------------------------------------- Transaction definition -------------------------------------------
@@ -98,19 +90,23 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn new(sender: Wallet, receiver: Wallet, transaction_info: TransactionInfo, signature: Vec<u8>) -> Result<Self, ErrorStack> {
-        
+    pub fn new(
+        sender: Wallet,
+        receiver: Wallet,
+        transaction_info: TransactionInfo,
+        signature: Vec<u8>,
+    ) -> Result<Self, ErrorStack> {
         let verify_signature = match sender.verify_transaction_info(&transaction_info, &signature) {
             Ok(value) => value,
             Err(e) => return Err(e),
         };
-        
+
         if verify_signature {
             Ok(Self {
                 sender,
                 receiver,
                 signature,
-                transaction_info
+                transaction_info,
             })
         } else {
             panic!("Signature couldn't be verified");
@@ -135,13 +131,16 @@ impl Transaction {
     pub fn deserialize(json: String) -> Result<Transaction, TransactionDeserializeError> {
         let tx: Transaction = match serde_json::from_str(&json) {
             Ok(tx) => tx,
-            Err(e) => return Err(TransactionDeserializeError::SerdeError(e))
+            Err(e) => return Err(TransactionDeserializeError::SerdeError(e)),
         };
 
         if tx.transaction_info.value <= 0.0 {
             return Err(TransactionDeserializeError::InsufficientFunds);
         }
-        let verified = match tx.sender.verify_transaction_info(&tx.transaction_info, &tx.signature) {
+        let verified = match tx
+            .sender
+            .verify_transaction_info(&tx.transaction_info, &tx.signature)
+        {
             Ok(value) => value,
             Err(e) => return Err(TransactionDeserializeError::OpenSSLError(e)),
         };

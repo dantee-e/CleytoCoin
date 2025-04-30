@@ -1,5 +1,8 @@
-use cleyto_coin::chain::{transaction::{Transaction, TransactionInfo}, wallet::Wallet};
 use chrono::Utc;
+use cleyto_coin::chain::{
+    transaction::{Transaction, TransactionInfo},
+    wallet::Wallet,
+};
 
 #[test]
 fn sign_and_verify_transactioninfo() {
@@ -10,9 +13,16 @@ fn sign_and_verify_transactioninfo() {
         Ok(signed_hashed_message) => signed_hashed_message,
         _ => panic!("error while signing transaction"),
     };
-    println!("Transaction signature (signed using the wallet_pk):\n{:?}", signature);
+    println!(
+        "Transaction signature (signed using the wallet_pk):\n{:?}",
+        signature
+    );
 
-    if wallet.verify_transaction_info(&transactioninfo, &signature).unwrap() == true {
+    if wallet
+        .verify_transaction_info(&transactioninfo, &signature)
+        .unwrap()
+        == true
+    {
         println!("transaction verified (by the wallet)");
     } else {
         println!("transaction not verified");
@@ -36,7 +46,10 @@ fn serialize_and_deserialize_transaction() {
     println!("serialized_transaction: \n{serialized_transaction}");
 
     let deserialized_transaction = match Transaction::deserialize(serialized_transaction) {
-        Ok(value) => {println!("Success deserializing transaction"); value},
+        Ok(value) => {
+            println!("Success deserializing transaction");
+            value
+        }
         Err(_) => panic!("Error deserializing transaction"),
     };
 }

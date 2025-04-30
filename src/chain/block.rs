@@ -2,9 +2,8 @@ use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
 use super::transaction::Transaction;
-use super::Chain;
 use super::utils::PROOF_OF_WORK_DIFFICULTY;
-
+use super::Chain;
 
 #[derive(Clone)]
 pub struct Block {
@@ -13,7 +12,7 @@ pub struct Block {
     index: u64,
     timestamp: DateTime<Utc>,
     hash: String,
-    nonce: u64
+    nonce: u64,
 }
 
 impl Block {
@@ -26,14 +25,14 @@ impl Block {
     }
 
     pub fn calculate_hash(&self) -> String {
-        let transactions_string = self.transactions
+        let transactions_string = self
+            .transactions
             .iter()
             .map(|t| t.to_string()) // Calls the `to_string()` method of `Transaction`
             .collect::<Vec<String>>() // Collects into a Vec<String>
             .join("::END_OF_TRANSACTION::BEGIN_OF_TRANSACTION::"); // Joins all elements with "; " as separator
-        
-        let serialized = serde_json::to_string
-        (&(
+
+        let serialized = serde_json::to_string(&(
             "BEGIN::BEGIN_PREVIOUS_HASH::",
             &self.previous_hash,
             "::END_PREVIOUS_HASH::BEGIN_TRANSACTIONS::",
@@ -47,7 +46,8 @@ impl Block {
             "::END_TIMESTAMP::BEGIN_NONCE::",
             &self.nonce,
             "::END_NONCE::END",
-        )).expect("Coudn't serialize the block to create the hash");
+        ))
+        .expect("Coudn't serialize the block to create the hash");
 
         println!("behold the serialized block:\n{serialized}");
 
@@ -64,30 +64,30 @@ impl Block {
         let index = chain.get_last_index() + 1;
         let timestamp = Utc::now();
 
-        
         let mut block = Self {
             previous_hash,
             transactions,
             index,
             timestamp,
             hash: String::new(),
-            nonce: 0 // temporary so that we can calculate hash
+            nonce: 0, // temporary so that we can calculate hash
         };
 
         block.hash = block.calculate_hash();
 
         block
-
     }
 
-    pub fn genesis_block() -> Self{
+    pub fn genesis_block() -> Self {
         Self {
             previous_hash: String::from("Foguete nao da re"),
             transactions: Vec::new(),
             index: 0,
             timestamp: Utc::now(),
-            hash: String::from("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"),
-            nonce: 0
+            hash: String::from(
+                "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+            ),
+            nonce: 0,
         }
     }
 
@@ -95,7 +95,7 @@ impl Block {
         let prefix = "0".repeat(PROOF_OF_WORK_DIFFICULTY.into());
 
         while !self.hash.starts_with(&prefix) {
-            self.nonce+=1;
+            self.nonce += 1;
             self.hash = self.calculate_hash();
         }
 
