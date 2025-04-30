@@ -1,13 +1,12 @@
 use super::wallet::Wallet;
 use chrono::{DateTime, Utc};
-use core::panic;
 use openssl::error::ErrorStack;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-// ---------------------------------------------- TransactionInfo definition ----------------------------------------
+// ---------------------------------------------- TransactionInfo definition -----------------------
 pub struct TransactionInfo {
     pub value: f32,
     pub date: DateTime<Utc>,
@@ -26,65 +25,65 @@ impl TransactionInfo {
         )
     }
 }
-// -----------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
-// --------------------------------------- Transaction Serialization Utils -----------------------------------------
+// --------------------------------------- Transaction Serialization Utils -------------------------
 
 // TODO move this to a errors file
 #[derive(Debug)]
 pub enum TransactionDeserializeError {
-    InvalidSignature,
     InsufficientFunds,
     MalformedTransaction,
-    OpenSSLError(ErrorStack),
     SerdeError(serde_json::Error),
 }
 impl fmt::Display for TransactionDeserializeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TransactionDeserializeError::InvalidSignature => write!(f, "Invalid signature"),
             TransactionDeserializeError::InsufficientFunds => write!(f, "Insufficient funds"),
             TransactionDeserializeError::MalformedTransaction => write!(f, "Malformed transaction"),
-            TransactionDeserializeError::OpenSSLError(e) => write!(f, "OpenSSL Error"),
             TransactionDeserializeError::SerdeError(value) => write!(f, "{}", value),
         }
     }
 }
 impl std::error::Error for TransactionDeserializeError {}
 
-/*
-mod signature_def {
-    use rsa::BigUint;
-    use serde::{Deserialize, Serialize};
-    use serde_bytes;
-    use smallvec::SmallVec;
 
-    type BigDigit = u64;
-    const VEC_SIZE: usize = 4;
-
-    #[derive(Serialize, Deserialize)]
-    #[serde(remote = "BigUint")]
-    struct BigUintDef {
-        data: SmallVec<[BigDigit; VEC_SIZE]>,
+#[derive(Debug)]
+pub enum TransactionValidationError {
+    OpenSSLError(ErrorStack),
+    ValidationError
+}
+impl fmt::Display for TransactionValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TransactionValidationError::OpenSSLError(e) => {
+                let mut error = String::new();
+                error += "The validation of the transaction was not successful due to some \
+                internal OpenSSL error:";
+                for i in e.errors() {
+                    error += &format!("\n{}", i);
+                }
+                write!(f, "{}", error)
+            },
+            TransactionValidationError::ValidationError => {
+                write!(f, "The validation of the transaction was not successful, as the signature \
+                did not match the provided transaction info.")
+            }
+        }
+        
     }
+}
+impl std::error::Error for TransactionValidationError {}
 
-    #[derive(Serialize, Deserialize)]
-    #[serde(remote = "rsa::pkcs1v15::Signature")]
-    pub struct SignatureDef {
-        inner: BigUint,
-        len: usize,
-    }
-} */
 
-// -----------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
-// ---------------------------------------------- Transaction definition -------------------------------------------
+// ------------------------------------- Transaction definition ------------------------------------
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub sender: Wallet,
     pub receiver: Wallet,
-    // #[serde(with = "signature_def::SignatureDef")]
     pub signature: Vec<u8>,
     pub transaction_info: TransactionInfo,
 }
@@ -94,22 +93,28 @@ impl Transaction {
         sender: Wallet,
         receiver: Wallet,
         transaction_info: TransactionInfo,
-        signature: Vec<u8>,
-    ) -> Result<Self, ErrorStack> {
-        let verify_signature = match sender.verify_transaction_info(&transaction_info, &signature) {
-            Ok(value) => value,
-            Err(e) => return Err(e),
+        signature: Vec<u8>
+    ) -> Result<Self, TransactionValidationError> {
+        let transaction = Self {
+            sender,
+            receiver,
+            signature,
+            transaction_info,
         };
 
-        if verify_signature {
-            Ok(Self {
-                sender,
-                receiver,
-                signature,
-                transaction_info,
-            })
-        } else {
-            panic!("Signature couldn't be verified");
+        match transaction.verify(){
+            Ok(()) => Ok(transaction),
+            Err(error) => return Err(error)
+        }
+    }
+
+    pub(crate) fn verify(&self) -> Result<(), TransactionValidationError> {
+        match self.sender.verify_transaction_info(&self.transaction_info, &self.signature) {
+            Ok(value) => match value {
+                true => Ok(()),
+                false => Err(TransactionValidationError::ValidationError)
+            },
+            Err(stack) => Err(TransactionValidationError::OpenSSLError(stack)),
         }
     }
 
@@ -125,7 +130,7 @@ impl Transaction {
 
     pub fn serialize(&self) -> String {
         let value = serde_json::to_string(self).unwrap();
-        println!("serialized transaction: {value}");
+        // println!("serialized transaction: {value}");
         value
     }
     pub fn deserialize(json: String) -> Result<Transaction, TransactionDeserializeError> {
@@ -137,17 +142,7 @@ impl Transaction {
         if tx.transaction_info.value <= 0.0 {
             return Err(TransactionDeserializeError::InsufficientFunds);
         }
-        let verified = match tx
-            .sender
-            .verify_transaction_info(&tx.transaction_info, &tx.signature)
-        {
-            Ok(value) => value,
-            Err(e) => return Err(TransactionDeserializeError::OpenSSLError(e)),
-        };
-        if !verified {
-            return Err(TransactionDeserializeError::InvalidSignature);
-        }
-        // TODO check if wallets exist
+        
         Ok(tx)
     }
 }

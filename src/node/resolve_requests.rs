@@ -111,12 +111,14 @@ pub mod endpoints {
     use std::collections::HashMap;
 
     mod endpoints {
-        use crate::chain::transaction::Transaction;
+        use std::path::PathBuf;
+        use serde_json::json;
+        use crate::chain::transaction::{Transaction, TransactionDeserializeError, TransactionValidationError};
         use crate::node::resolve_requests::endpoints::errors::HTTPResponseError;
         use crate::node::resolve_requests::endpoints::helpers::{
             return_html, return_image, HTTPResult,
         };
-        use crate::node::resolve_requests::methods::{GETData, ImageType, POSTData};
+        use crate::node::resolve_requests::methods::{Content, GETData, HTTPResponse, ImageType, POSTData};
 
         pub fn index(data: &GETData) -> HTTPResult {
             return_html("index.html")
@@ -124,21 +126,53 @@ pub mod endpoints {
 
         pub fn submit_transaction(data: &POSTData) -> HTTPResult {
             let body = data.body.clone().unwrap();
-            let json: Transaction = match serde_json::from_str(body.as_str()) {
-                Ok(json) => json,
-                Err(_) => {
-                    return Err(HTTPResponseError::InvalidBody(None));
+            let transaction: Transaction = match Transaction::deserialize(body) {
+                Ok(tx) => tx,
+                Err(e) => {
+                    return match e {
+                        TransactionDeserializeError::InsufficientFunds => {
+                            Err(HTTPResponseError::InvalidBody(None))
+                        }
+                        TransactionDeserializeError::MalformedTransaction => {
+                            Err(HTTPResponseError::InvalidBody(None))
+                        }
+                        TransactionDeserializeError::SerdeError(_) => {
+                            Err(HTTPResponseError::InvalidBody(None))
+                        }
+                    }
                 }
             };
-            Err(HTTPResponseError::InternalServerError(Some(
-                "Something went wrong on the submit_transaction function"
-                    .parse()
-                    .unwrap(),
-            )))
+            
+            match transaction.verify() {
+                Ok(()) => {},
+                Err(e) => {
+                    return match e {
+                        TransactionValidationError::OpenSSLError(_) => {
+                            Err(HTTPResponseError::InternalServerError(Some("Error in \
+                            the OpenSSL library when verifying a transaction".to_string())))
+                        }
+                        TransactionValidationError::ValidationError => {
+                            Err(HTTPResponseError::BadRequest(Some("Transaction submitted with \
+                            invalid signature".to_string())))
+                        }
+                    }
+                }
+            };
+
+            Ok(HTTPResponse::OK(Some(Content::JSON(
+                json!({
+                    "msg": "The transaction was added to the pool.",
+                    "status_code": "200"
+                })
+            ))))
         }
 
         pub fn favicon(data: &GETData) -> HTTPResult {
             return_image("fav.ico", ImageType::ICO)
+        }
+
+        pub fn pinto_grandegorsso(data: &GETData) -> HTTPResult {
+            return_html("200.html")
         }
     }
     use crate::node::resolve_requests::endpoints::errors::HTTPResponseError;
@@ -152,8 +186,6 @@ pub mod endpoints {
          need it
          */
 
-
-
         fn add_endpoint<'a>(
             path: &'a str,
             endpoints: &mut HashMap<&'a str, HashMap<&str, Box<dyn Handler>>>,
@@ -161,7 +193,6 @@ pub mod endpoints {
             post: Option<POSTFunc>,
         ) {
             let mut methods: HashMap<&str, Box<dyn Handler>> = HashMap::new();
-
             if let Some(get) = get {
                 methods.insert("GET", Box::new(get) as Box<dyn Handler>);
             }
@@ -176,6 +207,8 @@ pub mod endpoints {
 
         add_endpoint("/", &mut endpoints, Some(index), None);
         add_endpoint("/favicon.ico", &mut endpoints, Some(favicon), None);
+        add_endpoint("/submit-transactions", &mut endpoints, None, Some(submit_transaction));
+        add_endpoint("/pinto", &mut endpoints, Some(pinto_grandegorsso), None);
 
         let (path, method) = match request.get_method() {
             Method::GET(data) => (data.path.clone(), "GET"),
@@ -241,6 +274,7 @@ pub mod methods {
         Image(PathBuf, ImageType), // path to image file
         PlainText(String),
     }
+
     pub enum HTTPResponse {
         OK(Option<Content>),
         InvalidMethod,
