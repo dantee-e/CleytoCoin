@@ -23,7 +23,6 @@ impl Logger {
     }
 
      fn log_internal(&self, log: String) { 
-        println!("Logging {log}");
         let mut logs = self.logs.lock().unwrap(); // Lock the Mutex to modify the logs
         logs.push(log);
         

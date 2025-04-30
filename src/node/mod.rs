@@ -8,7 +8,7 @@ use std::fmt::Error;
 use core::panic;
 use std::time::Duration;
 use resolve_requests::{
-    methods::{return_json, HTTPParseError, HTTPRequest, HTTPResponse},
+    methods::{HTTPParseError, HTTPRequest, HTTPResponse},
     endpoints::resolve_endpoint
 };
 use crate::chain::{transaction::Transaction, Chain};
@@ -17,10 +17,7 @@ use thread_pool::custom_thread_pool::ThreadPool;
 use std::{
     collections::HashMap, io::{prelude::*, BufReader}, net::{TcpListener, TcpStream}, sync::{mpsc::Receiver, Arc, Mutex}, thread
 };
-
-
-
-
+use std::path::PathBuf;
 
 pub struct Node {
     chain: Chain,
@@ -101,12 +98,12 @@ impl Node {
 
         // If method is GET, return before trying to read the body
         if method == "GET" {
-            return Ok(HTTPRequest::new(None, method, path, http_version, http_headers, None))
+            return Ok(HTTPRequest::new(None, method, PathBuf::from(path), http_version, http_headers, None))
         }
 
 
 
-        // getting content_lenght from headers
+        // getting content_length from headers
         let content_length = match http_headers.get("content-length") {
             Some(value) => match value.parse::<usize>() {
                 Ok(length) => length,
@@ -132,33 +129,26 @@ impl Node {
 
 
         if method == "POST"{
-            return Ok(HTTPRequest::new(None, method, path, http_version, http_headers, http_body))
+            return Ok(HTTPRequest::new(None, method, PathBuf::from(path), http_version, http_headers, http_body))
         }
 
         Err(HTTPParseError::InvalidStatusLine)
     }
 
-    fn handle_connection(stream: TcpStream) -> Result<String, String>{
-
+    fn handle_connection(stream: TcpStream) -> Result<Option<String>, Option<String>>{
         let buf_reader = BufReader::new(&stream);
-
-
 
         let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {
             Ok(value) => value,
             Err(e) => {
-                println!("Error processing HTTP request: {e}");
-                return_json(&stream, HTTPResponse::BadRequest);
-                return Err("Error processing HTTP request: {e}".parse().unwrap());
+                return Err(Some("Error processing HTTP request: {e}".parse().unwrap()));
             },
         };
 
         request_object.set_stream(stream);
 
-
+        // TODO add logging
         resolve_endpoint(request_object)
-
-
     }
 
     pub fn run(&mut self, default: bool, rx: Arc<Mutex<Receiver<()>>>, selected_port: u16) {
@@ -203,8 +193,9 @@ impl Node {
                     let logger = Arc::clone(&self.logger);
                     thread_pool.execute(move || {
                         match Self::handle_connection(stream) {
-                            Ok(value) => logger.log(format!("{value}")),
-                            Err(value) => logger.log_error(format!("{value}"))
+                            Ok(Some(value)) => logger.log(format!("{value}")),
+                            Err(Some(value)) => logger.log_error(format!("{value}")),
+                            _ => {}
                         };
                     })
                 },

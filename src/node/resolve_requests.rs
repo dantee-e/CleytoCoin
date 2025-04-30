@@ -1,69 +1,214 @@
-
-
-
 pub mod endpoints {
-    use crate::chain::transaction::Transaction;
+    mod errors {
+        use std::fmt;
 
-    use super::methods::{HTTPRequest, HTTPResponse, Method};
-
-    fn path_not_found() -> Result<String, String>{
-        Err(String::from("Someone tried to access a nonexistent path"))
+        #[derive(Debug)]
+        pub enum HTTPResponseError {
+            InvalidMethod(Option<String>),
+            InvalidPath(Option<String>),
+            InvalidBody(Option<String>),
+            InternalServerError(Option<String>),
+            BadRequest(Option<String>),
+        }
+        impl fmt::Display for HTTPResponseError {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match self {
+                    _ => todo!(),
+                }
+            }
+        }
+        impl std::error::Error for HTTPResponseError {}
     }
+    mod helpers {
+        use std::path::PathBuf;
+        use crate::node::resolve_requests::endpoints::errors::HTTPResponseError;
+        use crate::node::resolve_requests::methods::{Content, GETData, HTTPRequest, HTTPResponse, Method, POSTData};
 
-    fn index(mut request: HTTPRequest) -> Result<String, String> {
+        const STATIC_FOLDER: &str = "src/node/static/";
 
-        request.response(HTTPResponse::OK);
-        Ok(String::from("Index.html returned to client"))
-    }
+        pub type HTTPResult = Result<HTTPResponse, HTTPResponseError>;
 
-    fn submit_transaction(mut request: HTTPRequest) -> Result<String, String> {
-        if let Method::GET(_) = request.get_method() {
-            request.response(HTTPResponse::InvalidMethod);
-            return Err(String::from("Method not supported on function submit_transaction"));
+        pub type POSTFunc = fn(&POSTData) -> HTTPResult;
+        pub type GETFunc = fn(&GETData) -> HTTPResult;
+
+        pub fn path_not_found() -> HTTPResult{
+            Err(HTTPResponseError::InvalidPath(Some("Path not found".to_string())))
+        }
+        pub fn method_not_allowed() -> HTTPResult{
+            Err(HTTPResponseError::InvalidMethod(None))
         }
 
-        if let Method::POST(data) = request.get_method() {
-            let json: Transaction = match serde_json::from_str(&data.body.unwrap()){
+        pub trait Handler { fn call(&self, request: &HTTPRequest) -> HTTPResult; }
+
+        // Implement the trait for GETFunc
+        impl Handler for GETFunc {
+            fn call(&self, request: &HTTPRequest) -> HTTPResult {
+                match request.get_method() {
+                    Method::GET(data) => self(&data),
+                    _ => method_not_allowed()
+                }
+            }
+        }
+
+        // Implement the trait for POSTFunc
+        impl Handler for POSTFunc {
+            fn call(&self, request: &HTTPRequest) -> HTTPResult {
+                match request.get_method() {
+                    Method::POST(data) => self(&data),
+                    _ => method_not_allowed()
+                }
+            }
+        }
+
+        pub fn return_image(path: &str) -> HTTPResult {
+            Ok(HTTPResponse::OK(Some(Content::Image(PathBuf::from(STATIC_FOLDER.to_owned() + path)))))
+        }
+        pub fn return_html(path: &str) -> HTTPResult {
+            Ok(HTTPResponse::OK(Some(Content::HTML(PathBuf::from(STATIC_FOLDER.to_owned() + path)))))
+        }
+
+        pub fn post(request: HTTPRequest, f: POSTFunc) -> HTTPResult {
+            let method = request.get_method();
+            if let Method::POST(data) = method {
+                f(data)
+            }
+            else {
+                Err(HTTPResponseError::InvalidMethod(None))
+            }
+        }
+        pub fn get(request: HTTPRequest, f: GETFunc) -> HTTPResult {
+            if let Method::GET(data) = request.get_method() {
+                f(data)
+            }
+            else {
+                Err(HTTPResponseError::InvalidMethod(None))
+            }
+        }
+        pub fn get_post(
+            request: HTTPRequest,
+            get: GETFunc,
+            post: POSTFunc
+        ) -> HTTPResult {
+            match request.get_method() {
+                Method::POST(data) => post(data),
+                Method::GET(data) => get(data)
+            }
+        }
+    }
+
+    use std::collections::HashMap;
+    use super::methods::{HTTPRequest, HTTPResponse, Method};
+    use helpers::*;
+
+    mod endpoints {
+        use crate::chain::transaction::Transaction;
+        use crate::node::resolve_requests::endpoints::errors::HTTPResponseError;
+        use crate::node::resolve_requests::endpoints::helpers::{return_html, return_image, HTTPResult};
+        use crate::node::resolve_requests::methods::{GETData, POSTData};
+
+        pub fn index(data: &GETData) -> HTTPResult {
+            return_html("index.html")
+        }
+
+        pub fn submit_transaction(data: &POSTData) -> HTTPResult {
+            let body = data.body.clone().unwrap();
+            let json: Transaction = match serde_json::from_str(body.as_str()) {
                 Ok(json) => json,
                 Err(_) => {
-                    request.response(HTTPResponse::BadRequest);
-                    return Err(String::from("Error extracting transaction from POST").to_string());
+                    return Err(HTTPResponseError::InvalidBody(None));
                 }
-
             };
-            request.response(HTTPResponse::OK);
-            return Ok(format!("Received transaction: {}", json.to_string()))
+            Err(HTTPResponseError::InternalServerError(Some("Something went wrong on the submit_transaction function".parse().unwrap())))
+
         }
 
-        Err(String::from("Something went wrong on the submit_transaction function"))
-
-    }
-
-    fn favicon(mut request: HTTPRequest) -> Result<String, String> {
-        if let Method::GET(_) = request.get_method() {
-            // TODO implement the happy path
-            return Err(String::from("Favicon"));
+        pub fn favicon(data: &GETData) -> HTTPResult {
+            return_image("favicon.ico")
         }
     }
+    use endpoints::*;
+    use crate::node::resolve_requests::endpoints::errors::HTTPResponseError;
 
-    pub fn resolve_endpoint(request: HTTPRequest) -> Result<String, String> {
-        match request.get_method() {
-            Method::GET(data) => {
-                match data.path.as_str() {
-                    "/" => index(request),
-                    "/favicon.ico" => favicon(request),
-                    _ => path_not_found(),
+    pub fn resolve_endpoint(mut request: HTTPRequest) -> Result<Option<String>, Option<String>> {
+        /*
+        TODO: This creates the endpoints var every time the resolve_endpoints function runs,
+         which is very inefficient. We should move the creation of the endpoints var to the
+         initialization of the program, and pass it around as a parameter to the functions that
+         need it
+         */
 
-                }
-            },
-            Method::POST(data) => {
-                match data.path.as_str() {
-                    "/" => index(request),
-                    _ => path_not_found(),
-                }
-            },
+        fn handle_error(request: &mut HTTPRequest, response: HTTPResponse, log: Option<&str>) -> Result<(), String> {
+            request.response(response);
+            Err(log.map(String::from).unwrap_or_default())
         }
 
+        fn add_endpoint<'a>(
+            path: &'a str,
+            endpoints: &mut HashMap<&'a str, HashMap<&str, Box<dyn Handler>>>,
+            get: Option<GETFunc>,
+            post: Option<POSTFunc>
+        ) {
+            let mut methods: HashMap<&str, Box<dyn Handler>> = HashMap::new();
+
+            if let Some(get) = get {
+                methods.insert("GET", Box::new(get) as Box<dyn Handler>);
+            }
+            if let Some(post) = post {
+                methods.insert("POST", Box::new(post) as Box<dyn Handler>);
+            }
+
+            endpoints.insert(path, methods);
+
+        }
+        
+
+        let mut endpoints: HashMap<&str, HashMap<&str, Box<dyn Handler>>> = HashMap::new();
+
+        add_endpoint("/", &mut endpoints, Some(index), None);
+        add_endpoint("/favicon.ico", &mut endpoints, Some(favicon), None);
+
+
+        let (path, method) = match request.get_method() {
+            Method::GET(data) => (data.path.clone(), "GET"),
+            Method::POST(data) => (data.path.clone(), "POST"),
+        };
+
+         let r = match endpoints.get(path.to_str().unwrap()) {
+            Some(methods) => match methods.get(method) {
+                Some(handler) => handler.call(&request),
+                None => method_not_allowed(),
+            },
+            None => path_not_found(),
+        };
+        
+        let log = String::new();
+        match r {
+            Ok(value) => {request.response(value); Ok(Some("Success".to_string()))}
+            Err(e) => {
+                match e {
+                    HTTPResponseError::InvalidMethod(log) => {
+                        request.response(HTTPResponse::InvalidMethod);
+                        Err(log)
+                    },
+                    HTTPResponseError::InvalidPath(log) => {
+                        request.response(HTTPResponse::BadRequest);
+                        Err(log)
+                    },
+                    HTTPResponseError::InvalidBody(log) => {
+                        request.response(HTTPResponse::BadRequest);
+                        Err(log)
+                    },
+                    HTTPResponseError::InternalServerError(log) => {
+                        request.response(HTTPResponse::InternalServerError);
+                        Err(log)
+                    },
+                    HTTPResponseError::BadRequest(log) => {
+                        request.response(HTTPResponse::BadRequest);
+                        Err(log)
+                    },
+                }
+            }
+        }
     }
 }
 
@@ -73,30 +218,31 @@ pub mod methods {
     use std::{fmt, fs};
     use std::net::TcpStream;
     use std::io::prelude::*;
+    use std::path::{Path, PathBuf};
     use serde_json::json;
 
 
     pub enum Content {
-        HTML(String),    // path to HTML file
+        HTML(PathBuf),    // path to HTML file
         JSON(serde_json::Value),
-        Image(String),   // path to image file
+        Image(PathBuf),   // path to image file
         PlainText(String),
     }
     pub enum HTTPResponse {
         OK(Option<Content>),
         InvalidMethod,
         BadRequest,
-        Favicon
+        InternalServerError,
     }
 
 
     #[derive(Debug, Clone)]
     pub struct GETData {
-        pub path: String
+        pub path: PathBuf
     }
     #[derive(Debug, Clone)]
     pub struct POSTData {
-        pub path: String,
+        pub path: PathBuf,
         pub body: Option<String>
     }
 
@@ -106,15 +252,6 @@ pub mod methods {
         POST(POSTData)
     }
 
-    
-
-    #[derive(Debug)]
-    pub struct HTTPRequest {
-        stream: Option<TcpStream>,
-        pub headers: HashMap<String, String>,
-        method: Method,
-        http_version: String,
-    }
 
     struct Response {
         status: u16,
@@ -152,8 +289,22 @@ pub mod methods {
         }
     }
 
+    #[derive(Debug)]
+    pub struct HTTPRequest {
+        stream: Option<TcpStream>,
+        pub headers: HashMap<String, String>,
+        method: Method,
+        http_version: String,
+    }
+
     impl HTTPRequest {
-        pub fn new(stream: Option<TcpStream>, method: String, path: String, http_version: String, headers: HashMap<String, String>, body: Option<String>) -> HTTPRequest {
+        pub fn new(
+            stream: Option<TcpStream>, 
+            method: String, path: PathBuf, 
+            http_version: String, headers: 
+            HashMap<String, String>, 
+            body: Option<String>
+        ) -> HTTPRequest {
             HTTPRequest {
                 stream,
                 method: match method.as_str() {
@@ -169,9 +320,7 @@ pub mod methods {
 
         pub fn set_stream(&mut self, stream: TcpStream) { self.stream = Some(stream) }
 
-        pub fn get_method(&self) -> Method { self.method.clone() }
-
-
+        pub fn get_method(&self) -> &Method { &self.method }
 
         fn make_response(status: HTTPResponse, accept: Option<&str>) -> std::io::Result<Response> {
 
@@ -234,20 +383,26 @@ pub mod methods {
                         Ok(Response::new(400, "text/plain", b"400 Bad Request".to_vec()))
                     }
                 }
-                HTTPResponse::Favicon => {
-                    Ok(Response::new(200, "image/x-icon", fs::read("static/favicon.ico").unwrap_or_else(|_| b"".to_vec())))
+                HTTPResponse::InternalServerError => {
+                    if accept.unwrap_or("").contains("text/html") {
+                        Ok(Response::new(500, "text/html", fs::read("static/500.html").unwrap_or_else(|_| b"500 Internal Server Error".to_vec())))
+                    } else {
+                        Ok(Response::new(500, "text/plain", b"500 Internal Server Error".to_vec()))
+                    }
                 }
-            }.expect("TODO: panic message");
-
-            Ok(Response::new(500, "text/html", fs::read("static/500.html").unwrap_or_else(|_| b"500 Internal Server Error".to_vec())))
+            }
         }
         
-        pub fn response(&mut self, status: HTTPResponse) -> std::io::Result<()> {
+        pub fn response(&mut self, status: HTTPResponse) {
             let accept = self.headers.get("Accept").map(|s| s.as_str());
-            let resp = Self::make_response(status, accept)?;
-            self.stream.as_mut().unwrap().write_all(&resp.to_bytes())
+            let resp = Self::make_response(status, accept).unwrap();
+            if let Err(e) = self.stream.as_mut().unwrap().write_all(&resp.to_bytes()){
+                eprintln!("Error writing response to stream: {}", e);
+            }
+
         }
     }
+
 
     #[derive(Debug)]
     pub enum HTTPParseError {
@@ -268,42 +423,7 @@ pub mod methods {
     }
     impl std::error::Error for HTTPParseError {}
 
-    
 
-    pub fn return_json(mut stream: &TcpStream, status: HTTPResponse){
-        
-        let (msg, status_code) = match status {
-            HTTPResponse::OK => ("The request was successful".to_owned(), 200),
-            HTTPResponse::InvalidMethod => ("Invalid HTTP method".to_owned(), 405),
-            HTTPResponse::BadRequest => ("Bad Request".to_owned(), 400)
-        };
 
-        let response = json!({
-            "msg": msg,
-            "status_code": status_code
-        });
 
-        let success_json = serde_json::to_string(&response)
-            .expect("Couldn't convert the object to json");
-
-        let response = format!(
-            "HTTP/1.1 200 OK\r\n\
-            Content-Type: application/json\r\n\
-            Content-Length: {}\r\n
-{}", 
-            success_json.len(),
-            success_json
-        );
-
-        stream.write_all(response.as_bytes()).unwrap();
-    }
-
-    pub fn get(stream: &TcpStream, request: HTTPRequest) {
-        println!("{:#?}", request);
-        return_json(stream, HTTPResponse::OK);
-    }
-    pub fn post(stream: &TcpStream, request: HTTPRequest) {
-        println!("{:#?}", request);
-        return_json(&stream, HTTPResponse::OK);
-    }
 }

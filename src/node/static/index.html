@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cryptocoin Node Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .status p {
+            margin: 5px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Cryptocoin Node Dashboard</h1>
+    <div class="status">
+        <p><strong>Node Status:</strong> <span id="nodeStatus">Checking...</span></p>
+        <p><strong>Block Height:</strong> <span id="blockHeight">0</span></p>
+        <p><strong>Connected Peers:</strong> <span id="peers">0</span></p>
+        <p><strong>Last Updated:</strong> <span id="lastUpdated">-</span></p>
+    </div>
+    <button onclick="refreshStatus()">Refresh Status</button>
+</div>
+
+<script>
+    async function fetchNodeStatus() {
+        try {
+            // Placeholder for actual API call to node
+            // const response = await fetch('http://localhost:3000/api/status');
+            // const data = await response.json();
+
+            // Simulated data for demonstration
+            const data = {
+                status: "Online",
+                blockHeight: 123456,
+                peers: 8,
+                timestamp: new Date().toLocaleString()
+            };
+
+            document.getElementById('nodeStatus').textContent = data.status;
+            document.getElementById('blockHeight').textContent = data.blockHeight;
+            document.getElementById('peers').textContent = data.peers;
+            document.getElementById('lastUpdated').textContent = data.timestamp;
+        } catch (error) {
+            document.getElementById('nodeStatus').textContent = 'Offline';
+            console.error('Error fetching node status:', error);
+        }
+    }
+
+    function refreshStatus() {
+        fetchNodeStatus();
+    }
+
+    // Initial fetch
+    fetchNodeStatus();
+</script>
+</body>
+</html>
