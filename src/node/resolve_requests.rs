@@ -13,7 +13,12 @@ pub mod endpoints {
         impl fmt::Display for HTTPResponseError {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self {
-                    _ => todo!(),
+                    // If log adds log, else just prints the type of the enum
+                    HTTPResponseError::InvalidMethod(log) => {match log {None => {write!(f, "Invalid Method")}, Some(log) => {write!(f, "Invalid Method: {}", log)}}},
+                    HTTPResponseError::InvalidPath(log) => {match log {None => {write!(f, "Invalid Path")}, Some(log) => {write!(f, "Invalid Path: {}", log)}}},
+                    HTTPResponseError::InvalidBody(log) => {match log {None => {write!(f, "Invalid Body")}, Some(log) => {write!(f, "Invalid Body: {}", log)}}},
+                    HTTPResponseError::InternalServerError(log) => {match log {None => {write!(f, "Internal Server Error")}, Some(log) => {write!(f, "Internal Server Error: {}", log)}}},
+                    HTTPResponseError::BadRequest(log) => {match log {None => {write!(f, "Bad Request")}, Some(log) => {write!(f, "Bad Request: {}", log)}}},
                 }
             }
         }
@@ -185,11 +190,10 @@ pub mod endpoints {
             None => path_not_found(),
         };
 
-        let log = String::new();
         match r {
             Ok(value) => {
                 request.response(value);
-                Ok(Some("Success".to_string()))
+                Ok(Some(format!("Request {} to path {} was successful", method, path.to_str().unwrap())))
             }
             Err(e) => match e {
                 HTTPResponseError::InvalidMethod(log) => {
@@ -218,12 +222,11 @@ pub mod endpoints {
 }
 
 pub mod methods {
-    use core::panic;
     use serde_json::json;
     use std::collections::HashMap;
     use std::io::prelude::*;
     use std::net::TcpStream;
-    use std::path::PathBuf;
+    use std::path::{PathBuf};
     use std::{fmt, fs};
 
     pub enum ImageType {
@@ -259,6 +262,14 @@ pub mod methods {
     pub enum Method {
         GET(GETData),
         POST(POSTData),
+    }
+    impl fmt::Display for Method {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Method::GET(data) => write!(f, "GET {:?}", data.path),
+                Method::POST(data) => write!(f, "POST {:?}", data.path),
+            }
+        }
     }
 
     struct Response {
@@ -450,6 +461,36 @@ pub mod methods {
         }
     }
 
+    impl fmt::Display for HTTPRequest {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            // Write the HTTP method and version
+            writeln!(f, "Method: {}", self.method)?;
+            writeln!(f, "HTTP Version: {}", self.http_version)?;
+
+            // Write the stream status
+            writeln!(
+                f,
+                "Stream: {}",
+                if self.stream.is_some() {
+                    "Connected"
+                } else {
+                    "Disconnected"
+                }
+            )?;
+
+            // Write the headers
+            writeln!(f, "Headers:")?;
+            if self.headers.is_empty() {
+                writeln!(f, "  (none)")?;
+            } else {
+                for (key, value) in &self.headers {
+                    writeln!(f, "  {}: {}", key, value)?;
+                }
+            }
+
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub enum HTTPParseError {
         InvalidStatusLine,

@@ -20,7 +20,8 @@ fn main() -> color_eyre::Result<()> {
         let mut node = node::Node::new(Chain::new(), logger_clone_for_node);
         node.run(true, rx, 0);
     });
-
+    
+    // TODO Loggger nao scrolla
     color_eyre::install()?;
     let terminal = ratatui::init();
     let result = App::new(Arc::clone(&logger), node::Node::DEFAULT_PORT).run(terminal);

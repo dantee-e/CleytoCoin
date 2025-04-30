@@ -151,7 +151,7 @@ impl Node {
 
         Err(HTTPParseError::InvalidStatusLine)
     }
-
+    
     fn handle_connection(stream: TcpStream) -> Result<Option<String>, Option<String>> {
         let buf_reader = BufReader::new(&stream);
 
