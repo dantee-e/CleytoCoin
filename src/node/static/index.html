@@ -61,16 +61,10 @@
     async function fetchNodeStatus() {
         try {
             // Placeholder for actual API call to node
-            // const response = await fetch('http://localhost:3000/api/status');
-            // const data = await response.json();
+            const response = await fetch('http://localhost:9473/status');
+            const data = await response.json();
 
-            // Simulated data for demonstration
-            const data = {
-                status: "Online",
-                blockHeight: 123456,
-                peers: 8,
-                timestamp: new Date().toLocaleString()
-            };
+            
 
             document.getElementById('nodeStatus').textContent = data.status;
             document.getElementById('blockHeight').textContent = data.blockHeight;

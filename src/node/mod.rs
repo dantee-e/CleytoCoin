@@ -6,10 +6,7 @@ mod utils;
 
 use crate::chain::{transaction::Transaction, Chain};
 use core::panic;
-use resolve_requests::{
-    endpoints::resolve_endpoint,
-    methods::{HTTPParseError, HTTPRequest},
-};
+use resolve_requests::methods::{HTTPParseError, HTTPRequest};
 use std::time::Duration;
 use thread_pool::custom_thread_pool::ThreadPool;
 
@@ -30,6 +27,7 @@ pub struct Node {
 
 use crate::node::logger::Logger;
 use once_cell::sync::Lazy;
+use resolve_requests::endpoints::endpoints::resolve_endpoint;
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 
