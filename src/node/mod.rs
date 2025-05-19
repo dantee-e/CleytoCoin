@@ -151,14 +151,14 @@ impl Node {
 
         Err(HTTPParseError::InvalidStatusLine)
     }
-    
+
     fn handle_connection(stream: TcpStream) -> Result<Option<String>, Option<String>> {
         let buf_reader = BufReader::new(&stream);
 
         let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {
             Ok(value) => value,
             Err(e) => {
-                return Err(Some("Error processing HTTP request: {e}".parse().unwrap()));
+                return Err(Some(format!("Error processing HTTP request: {e}")));
             }
         };
 

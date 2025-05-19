@@ -1,10 +1,9 @@
+use chrono::Utc;
 use cleyto_coin::chain::transaction::{Transaction, TransactionInfo, TransactionValidationError};
 use cleyto_coin::chain::wallet::Wallet;
-use chrono::Utc;
-use std::fs;
 use reqwest::Client;
 use std::error::Error;
-
+use std::fs;
 
 #[tokio::main]
 async fn main() {
@@ -13,17 +12,15 @@ async fn main() {
 
 fn create_transaction_json() -> String {
     let (wallet1, mut wallet1_pk) = Wallet::new();
-    let (wallet2, wallet2_pk) = Wallet::new();
+    let (wallet2, _) = Wallet::new();
     let transaction_info = TransactionInfo::new(0.3, Utc::now());
     let signature = wallet1_pk.sign_transaction(&transaction_info).unwrap();
     let transaction = match Transaction::new(wallet1, wallet2, transaction_info, signature) {
         Ok(tx) => tx,
-        Err(e) => {
-            match e {
-                TransactionValidationError::OpenSSLError(_) => panic!("{e}"),
-                TransactionValidationError::ValidationError => panic!("Validation error"),
-            }
-        }
+        Err(e) => match e {
+            TransactionValidationError::OpenSSLError(_) => panic!("{e}"),
+            TransactionValidationError::ValidationError => panic!("Validation error"),
+        },
     };
 
     transaction.serialize()

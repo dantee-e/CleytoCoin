@@ -47,11 +47,10 @@ impl fmt::Display for TransactionDeserializeError {
 }
 impl std::error::Error for TransactionDeserializeError {}
 
-
 #[derive(Debug)]
 pub enum TransactionValidationError {
     OpenSSLError(ErrorStack),
-    ValidationError
+    ValidationError,
 }
 impl fmt::Display for TransactionValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -64,17 +63,18 @@ impl fmt::Display for TransactionValidationError {
                     error += &format!("\n{}", i);
                 }
                 write!(f, "{}", error)
-            },
+            }
             TransactionValidationError::ValidationError => {
-                write!(f, "The validation of the transaction was not successful, as the signature \
-                did not match the provided transaction info.")
+                write!(
+                    f,
+                    "The validation of the transaction was not successful, as the signature \
+                did not match the provided transaction info."
+                )
             }
         }
-        
     }
 }
 impl std::error::Error for TransactionValidationError {}
-
 
 // -------------------------------------------------------------------------------------------------
 
@@ -93,7 +93,7 @@ impl Transaction {
         sender: Wallet,
         receiver: Wallet,
         transaction_info: TransactionInfo,
-        signature: Vec<u8>
+        signature: Vec<u8>,
     ) -> Result<Self, TransactionValidationError> {
         let transaction = Self {
             sender,
@@ -102,17 +102,20 @@ impl Transaction {
             transaction_info,
         };
 
-        match transaction.verify(){
+        match transaction.verify() {
             Ok(()) => Ok(transaction),
-            Err(error) => return Err(error)
+            Err(error) => return Err(error),
         }
     }
 
     pub(crate) fn verify(&self) -> Result<(), TransactionValidationError> {
-        match self.sender.verify_transaction_info(&self.transaction_info, &self.signature) {
+        match self
+            .sender
+            .verify_transaction_info(&self.transaction_info, &self.signature)
+        {
             Ok(value) => match value {
                 true => Ok(()),
-                false => Err(TransactionValidationError::ValidationError)
+                false => Err(TransactionValidationError::ValidationError),
             },
             Err(stack) => Err(TransactionValidationError::OpenSSLError(stack)),
         }
@@ -142,7 +145,7 @@ impl Transaction {
         if tx.transaction_info.value <= 0.0 {
             return Err(TransactionDeserializeError::InsufficientFunds);
         }
-        
+
         Ok(tx)
     }
 }

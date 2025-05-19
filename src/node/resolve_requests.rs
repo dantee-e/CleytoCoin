@@ -14,11 +14,46 @@ pub mod endpoints {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self {
                     // If log adds log, else just prints the type of the enum
-                    HTTPResponseError::InvalidMethod(log) => {match log {None => {write!(f, "Invalid Method")}, Some(log) => {write!(f, "Invalid Method: {}", log)}}},
-                    HTTPResponseError::InvalidPath(log) => {match log {None => {write!(f, "Invalid Path")}, Some(log) => {write!(f, "Invalid Path: {}", log)}}},
-                    HTTPResponseError::InvalidBody(log) => {match log {None => {write!(f, "Invalid Body")}, Some(log) => {write!(f, "Invalid Body: {}", log)}}},
-                    HTTPResponseError::InternalServerError(log) => {match log {None => {write!(f, "Internal Server Error")}, Some(log) => {write!(f, "Internal Server Error: {}", log)}}},
-                    HTTPResponseError::BadRequest(log) => {match log {None => {write!(f, "Bad Request")}, Some(log) => {write!(f, "Bad Request: {}", log)}}},
+                    HTTPResponseError::InvalidMethod(log) => match log {
+                        None => {
+                            write!(f, "Invalid Method")
+                        }
+                        Some(log) => {
+                            write!(f, "Invalid Method: {}", log)
+                        }
+                    },
+                    HTTPResponseError::InvalidPath(log) => match log {
+                        None => {
+                            write!(f, "Invalid Path")
+                        }
+                        Some(log) => {
+                            write!(f, "Invalid Path: {}", log)
+                        }
+                    },
+                    HTTPResponseError::InvalidBody(log) => match log {
+                        None => {
+                            write!(f, "Invalid Body")
+                        }
+                        Some(log) => {
+                            write!(f, "Invalid Body: {}", log)
+                        }
+                    },
+                    HTTPResponseError::InternalServerError(log) => match log {
+                        None => {
+                            write!(f, "Internal Server Error")
+                        }
+                        Some(log) => {
+                            write!(f, "Internal Server Error: {}", log)
+                        }
+                    },
+                    HTTPResponseError::BadRequest(log) => match log {
+                        None => {
+                            write!(f, "Bad Request")
+                        }
+                        Some(log) => {
+                            write!(f, "Bad Request: {}", log)
+                        }
+                    },
                 }
             }
         }
@@ -111,14 +146,18 @@ pub mod endpoints {
     use std::collections::HashMap;
 
     mod endpoints {
-        use std::path::PathBuf;
-        use serde_json::json;
-        use crate::chain::transaction::{Transaction, TransactionDeserializeError, TransactionValidationError};
+        use crate::chain::transaction::{
+            Transaction, TransactionDeserializeError, TransactionValidationError,
+        };
         use crate::node::resolve_requests::endpoints::errors::HTTPResponseError;
         use crate::node::resolve_requests::endpoints::helpers::{
             return_html, return_image, HTTPResult,
         };
-        use crate::node::resolve_requests::methods::{Content, GETData, HTTPResponse, ImageType, POSTData};
+        use crate::node::resolve_requests::methods::{
+            Content, GETData, HTTPResponse, ImageType, POSTData,
+        };
+        use serde_json::json;
+        use std::path::PathBuf;
 
         pub fn index(data: &GETData) -> HTTPResult {
             return_html("index.html")
@@ -142,37 +181,36 @@ pub mod endpoints {
                     }
                 }
             };
-            
+
             match transaction.verify() {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(e) => {
                     return match e {
                         TransactionValidationError::OpenSSLError(_) => {
-                            Err(HTTPResponseError::InternalServerError(Some("Error in \
-                            the OpenSSL library when verifying a transaction".to_string())))
+                            Err(HTTPResponseError::InternalServerError(Some(
+                                "Error in the OpenSSL library when verifying a transaction"
+                                    .to_string(),
+                            )))
                         }
                         TransactionValidationError::ValidationError => {
-                            Err(HTTPResponseError::BadRequest(Some("Transaction submitted with \
-                            invalid signature".to_string())))
+                            Err(HTTPResponseError::BadRequest(Some(
+                                "Transaction submitted with \
+                            invalid signature"
+                                    .to_string(),
+                            )))
                         }
                     }
                 }
             };
 
-            Ok(HTTPResponse::OK(Some(Content::JSON(
-                json!({
-                    "msg": "The transaction was added to the pool.",
-                    "status_code": "200"
-                })
-            ))))
+            Ok(HTTPResponse::OK(Some(Content::JSON(json!({
+                "msg": "The transaction was added to the pool.",
+                "status_code": "200"
+            })))))
         }
 
         pub fn favicon(data: &GETData) -> HTTPResult {
             return_image("fav.ico", ImageType::ICO)
-        }
-
-        pub fn pinto_grandegorsso(data: &GETData) -> HTTPResult {
-            return_html("200.html")
         }
     }
     use crate::node::resolve_requests::endpoints::errors::HTTPResponseError;
@@ -207,8 +245,12 @@ pub mod endpoints {
 
         add_endpoint("/", &mut endpoints, Some(index), None);
         add_endpoint("/favicon.ico", &mut endpoints, Some(favicon), None);
-        add_endpoint("/submit-transactions", &mut endpoints, None, Some(submit_transaction));
-        add_endpoint("/pinto", &mut endpoints, Some(pinto_grandegorsso), None);
+        add_endpoint(
+            "/submit-transactions",
+            &mut endpoints,
+            None,
+            Some(submit_transaction),
+        );
 
         let (path, method) = match request.get_method() {
             Method::GET(data) => (data.path.clone(), "GET"),
@@ -226,7 +268,11 @@ pub mod endpoints {
         match r {
             Ok(value) => {
                 request.response(value);
-                Ok(Some(format!("Request {} to path {} was successful", method, path.to_str().unwrap())))
+                Ok(Some(format!(
+                    "Request {} to path {} was successful",
+                    method,
+                    path.to_str().unwrap()
+                )))
             }
             Err(e) => match e {
                 HTTPResponseError::InvalidMethod(log) => {
@@ -259,7 +305,7 @@ pub mod methods {
     use std::collections::HashMap;
     use std::io::prelude::*;
     use std::net::TcpStream;
-    use std::path::{PathBuf};
+    use std::path::PathBuf;
     use std::{fmt, fs};
 
     pub enum ImageType {
