@@ -72,7 +72,6 @@ use super::methods::{
 mod helpers {
     use super::*;
     use std::path::PathBuf;
-    use serde_json::{json, Value};
     use super::errors::HTTPResponseError;
 
     const STATIC_FOLDER: &str = "src/node/static/";
@@ -181,7 +180,7 @@ mod helpers {
 
 pub mod endpoints {
     use super::*;
-    use super::helpers::{return_html, return_image, HTTPResult, Handler, GETFunc, POSTFunc, GETFuncWrapper, POSTFuncWrapper, method_not_allowed, path_not_found, return_json};
+    use super::helpers::{return_html, return_image, HTTPResult, Handler, GETFunc, POSTFunc, method_not_allowed, path_not_found, return_json};
     use super::errors::{
         HTTPResponseError
     };
@@ -193,7 +192,7 @@ pub mod endpoints {
     };
     use serde_json::json;
 
-    pub fn index(data: &GETData) -> HTTPResult {
+    pub fn index(_: &GETData) -> HTTPResult {
         return_html("index.html")
     }
 
@@ -243,11 +242,11 @@ pub mod endpoints {
         })))))
     }
 
-    pub fn favicon(data: &GETData) -> HTTPResult {
+    pub fn favicon(_: &GETData) -> HTTPResult {
         return_image("fav.ico", ImageType::ICO)
     }
 
-    pub fn status(data: &GETData) -> HTTPResult {
+    pub fn status(_: &GETData) -> HTTPResult {
         return_json(json!({
             "status": "Fodeline",
             "blockHeight": 123456,
@@ -263,23 +262,20 @@ pub mod endpoints {
          initialization of the program, and pass it around as a parameter to the functions that
          need it
          */
-        
-        fn curry_add_endpoint(endpoints: &mut HashMap<String, HashMap<String, Box<(dyn Handler)>>>)
-                                   -> impl FnMut(
-                                       String,
-                                       Option<fn(&GETData) -> HTTPResult>,
-                                       Option<fn(&POSTData) -> HTTPResult>
-                                   ) + use<'_> {
-            |path: String,
+
+        fn curry_add_endpoint<'a, 'b>(
+            endpoints: &'b mut HashMap<&'a str, HashMap<&'a str, Box<dyn Handler>>>
+        ) -> impl FnMut(&'a str, Option<GETFunc>, Option<POSTFunc>) + 'b {
+            |path: &'a str,
              get: Option<fn(&GETData) -> HTTPResult>,
              post: Option<fn(&POSTData) -> HTTPResult>
             | {
-                let mut methods: HashMap<String, Box<dyn Handler>> = HashMap::new();
+                let mut methods: HashMap<&'a str, Box<dyn Handler>> = HashMap::new();
                 if let Some(get) = get {
-                    methods.insert("GET".parse().unwrap(), Box::new(get) as Box<dyn Handler>);
+                    methods.insert("GET", Box::new(get) as Box<dyn Handler>);
                 }
                 if let Some(post) = post {
-                    methods.insert("POST".parse().unwrap(), Box::new(post) as Box<dyn Handler>);
+                    methods.insert("POST", Box::new(post) as Box<dyn Handler>);
                 }
 
                 endpoints.insert(path, methods);
@@ -289,25 +285,14 @@ pub mod endpoints {
 
 
 
-        let mut endpoints: HashMap<String, HashMap<String, Box<dyn Handler>>> = HashMap::new();
+        let mut endpoints: HashMap<&str, HashMap<&str, Box<dyn Handler>>> = HashMap::new();
 
-        let add_endpoints = curry_add_endpoint(&mut endpoints);
+
+        {
+            let mut add_endpoints = curry_add_endpoint(&mut endpoints);
+            add_endpoints("/", Some(index), None);
+        }
         
-
-        add_endpoints("/".to_owned(), Some(index), None);
-        add_endpoint("/favicon.ico", Some(favicon), None);
-        add_endpoint(
-            "/submit-transactions",
-            &mut endpoints,
-            None,
-            Some(submit_transaction),
-        );
-        add_endpoint(
-            "/status",
-            &mut endpoints,
-            Some(status),
-            None
-        );
 
         let (path, method) = match request.get_method() {
             Method::GET(data) => (data.path.clone(), "GET"),
