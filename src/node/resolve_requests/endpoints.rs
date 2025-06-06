@@ -1,3 +1,4 @@
+use super::super::LOG_LEVEL;
 use super::errors::HTTPResponseError;
 use super::helpers::{
     method_not_allowed, path_not_found, return_html, return_image, return_json, GETFunc,
@@ -143,7 +144,7 @@ pub fn resolve_endpoint(
             request.response(value);
             let path = path.to_str().unwrap();
             // I don't give a single fuck about favicon
-            if path == "/favicon.ico" {
+            if path == "/favicon.ico" || LOG_LEVEL < 2 {
                 return Ok(None);
             }
             Ok(Some(format!(

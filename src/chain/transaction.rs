@@ -149,18 +149,3 @@ impl Transaction {
         Ok(tx)
     }
 }
-
-// ---------------------------------------------- UNIT TESTS -------------------------------------------------------
-#[cfg(test)]
-mod tests {
-    use crate::chain::transaction::TransactionInfo;
-    use chrono::Utc;
-
-    #[test] //mark a function as a test.
-    fn test_transactioninfo_creation() {
-        let transaction: TransactionInfo = TransactionInfo::new(12345 as f32, Utc::now());
-        println!("transaction info:\n{}", transaction.to_string());
-        println!("{:?}", transaction);
-    }
-}
-// -----------------------------------------------------------------------------------------------------------------

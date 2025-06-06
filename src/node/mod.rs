@@ -31,6 +31,11 @@ pub struct Node {
 }
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
+// 0 = None
+// 1 = Prod
+// 2 = Debug
+
+pub const LOG_LEVEL: u8 = 2;
 
 impl Node {
     // these configurations should be moved to a file

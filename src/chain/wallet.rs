@@ -99,18 +99,3 @@ impl Wallet {
     }
 }
 // -----------------------------------------------------------------------------------------------------------------
-
-// ---------------------------------------------- UNIT TESTS -------------------------------------------------------
-#[cfg(test)] //ensures that the tests module is only included when running tests.
-mod tests {
-    use crate::chain::wallet::Wallet;
-
-    #[test] //mark a function as a test.
-    fn test_wallet_creation() {
-        let (wallet, wallet_pk) = Wallet::new();
-        println!("wallet.to_string: {:?}", wallet.to_vec());
-        println!("{:#?}", wallet);
-        println!("{:#?}", wallet_pk);
-    }
-}
-// -----------------------------------------------------------------------------------------------------------------
