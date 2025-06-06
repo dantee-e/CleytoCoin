@@ -9,6 +9,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::sync::Arc;
+use std::time::Duration;
 
 /// The main application which holds the state and logic of the application.
 
@@ -51,9 +52,21 @@ impl App {
             .centered();
         let logs_title = Line::from(" LOGS ").bold().blue().centered();
         let port = self.port;
+
+        let mut lines = self.logger.read_temp_logs().unwrap();
+
+        let offset = lines.len() as i32 - frame.area().height as i32;
+        if offset > 0 {
+            for _ in 0..offset {
+                lines.remove(0);
+            }
+        }
+
         let text = format!(
             "Node running in port {port}
-            \n\nPress `Esc`, `Ctrl-C` or `q` to stop running."
+            \n\nPress `Esc`, `Ctrl-C` or `q` to stop running.\n
+            lines size is {}",
+            lines.len()
         );
 
         frame.render_widget(
@@ -63,7 +76,7 @@ impl App {
             layout[0],
         );
         frame.render_widget(
-            Paragraph::new(self.logger.read_temp_logs().unwrap().join("\n"))
+            Paragraph::new(lines.join("\n"))
                 .block(Block::bordered().title(logs_title))
                 .left_aligned(),
             layout[1],
@@ -71,12 +84,13 @@ impl App {
     }
 
     fn handle_crossterm_events(&mut self) -> Result<()> {
-        match event::read()? {
-            // it's important to check KeyEventKind::Press to avoid handling key release events
-            Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key),
-            Event::Mouse(_) => {}
-            Event::Resize(_, _) => {}
-            _ => {}
+        if event::poll(Duration::from_millis(100))? {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key),
+                Event::Mouse(_) => {}
+                Event::Resize(_, _) => {}
+                _ => {}
+            }
         }
         Ok(())
     }

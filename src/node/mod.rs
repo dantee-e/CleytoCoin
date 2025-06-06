@@ -1,20 +1,16 @@
 pub mod logger;
-pub mod ui;
 mod resolve_requests;
 mod thread_pool;
+pub mod ui;
 mod utils;
-use crate::chain::{
-    transaction::Transaction,
-    Chain
-};
+use crate::chain::{transaction::Transaction, Chain};
+use crate::node::logger::Logger;
 use core::panic;
-use resolve_requests::methods::{
-    HTTPParseError, 
-    HTTPRequest
-};
-use std::time::Duration;
-use thread_pool::custom_thread_pool::ThreadPool;
+use once_cell::sync::Lazy;
+use resolve_requests::endpoints::resolve_endpoint;
+use resolve_requests::methods::{HTTPParseError, HTTPRequest};
 use std::path::PathBuf;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     io::{prelude::*, BufReader},
@@ -22,10 +18,7 @@ use std::{
     sync::{mpsc::Receiver, Arc, Mutex},
     thread,
 };
-use crate::node::logger::Logger;
-use once_cell::sync::Lazy;
-use resolve_requests::endpoints::resolve_endpoint;
-
+use thread_pool::custom_thread_pool::ThreadPool;
 
 pub struct NodeState {
     status: bool,
@@ -36,8 +29,6 @@ pub struct Node {
     state: Arc<Mutex<NodeState>>,
     logger: Arc<logger::Logger>,
 }
-
-
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 
@@ -163,8 +154,10 @@ impl Node {
         Err(HTTPParseError::InvalidStatusLine)
     }
 
-    fn handle_connection(state: Arc<Mutex<NodeState>>, stream: TcpStream) -> Result<Option<String>, 
-        Option<String>> {
+    fn handle_connection(
+        state: Arc<Mutex<NodeState>>,
+        stream: TcpStream,
+    ) -> Result<Option<String>, Option<String>> {
         let buf_reader = BufReader::new(&stream);
 
         let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {

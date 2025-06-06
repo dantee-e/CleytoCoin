@@ -1,17 +1,8 @@
-
+use super::methods::{Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData};
 use crate::node::resolve_requests::errors::HTTPResponseError;
+use crate::node::NodeState;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use crate::node::NodeState;
-use super::methods::{
-    Content, 
-    GETData, 
-    HTTPRequest, 
-    HTTPResponse,
-    ImageType,
-    Method, 
-    POSTData
-};
 
 const STATIC_FOLDER: &str = "src/node/static/";
 
@@ -19,13 +10,22 @@ pub type HTTPResult = Result<HTTPResponse, HTTPResponseError>;
 
 pub type POSTFunc = fn(&POSTData, Arc<Mutex<NodeState>>) -> HTTPResult;
 pub type GETFunc = fn(&GETData, Arc<Mutex<NodeState>>) -> HTTPResult;
-pub fn path_not_found(s: &str) -> HTTPResult {
-    Err(HTTPResponseError::InvalidPath(Some(format!(
-        "Path {} was not found",
-        s
-    ))))
+pub fn path_not_found(s: Option<&str>) -> HTTPResult {
+    if s.is_some() {
+        return Err(HTTPResponseError::InvalidPath(Some(format!(
+            "Path {} was not found",
+            s.unwrap()
+        ))));
+    }
+    Err(HTTPResponseError::InvalidPath(None))
 }
-pub fn method_not_allowed() -> HTTPResult {
+pub fn method_not_allowed(s: Option<&str>) -> HTTPResult {
+    if s.is_some() {
+        return Err(HTTPResponseError::InvalidMethod(Some(format!(
+            "Attempt of accessing the path {} with wrong method",
+            s.unwrap()
+        ))));
+    }
     Err(HTTPResponseError::InvalidMethod(None))
 }
 
@@ -38,7 +38,7 @@ impl Handler for GETFunc {
     fn call(&self, request: &HTTPRequest, state: Arc<Mutex<NodeState>>) -> HTTPResult {
         match request.get_method() {
             Method::GET(data) => self(&data, state),
-            _ => method_not_allowed(),
+            _ => method_not_allowed(None),
         }
     }
 }
@@ -48,7 +48,7 @@ impl Handler for POSTFunc {
     fn call(&self, request: &HTTPRequest, state: Arc<Mutex<NodeState>>) -> HTTPResult {
         match request.get_method() {
             Method::POST(data) => self(&data, state),
-            _ => method_not_allowed(),
+            _ => method_not_allowed(None),
         }
     }
 }
@@ -83,7 +83,12 @@ pub fn get(request: HTTPRequest, f: GETFunc, state: Arc<Mutex<NodeState>>) -> HT
         Err(HTTPResponseError::InvalidMethod(None))
     }
 }
-pub fn get_post(request: HTTPRequest, get: GETFunc, post: POSTFunc, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+pub fn get_post(
+    request: HTTPRequest,
+    get: GETFunc,
+    post: POSTFunc,
+    state: Arc<Mutex<NodeState>>,
+) -> HTTPResult {
     match request.get_method() {
         Method::POST(data) => post(data, state),
         Method::GET(data) => get(data, state),

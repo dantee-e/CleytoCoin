@@ -1,34 +1,17 @@
-use super::methods::{
-    Content, 
-    GETData,
-    HTTPRequest, 
-    HTTPResponse, 
-    ImageType, 
-    Method,
-    POSTData,
-};
 use super::errors::HTTPResponseError;
 use super::helpers::{
-    method_not_allowed,
-    path_not_found,
-    return_html, 
-    return_image, 
-    return_json,
-    GETFunc,
-    HTTPResult,
-    Handler,
-    POSTFunc,
+    method_not_allowed, path_not_found, return_html, return_image, return_json, GETFunc,
+    HTTPResult, Handler, POSTFunc,
 };
+use super::methods::{Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData};
 use crate::chain::transaction::{
-    Transaction,
-    TransactionDeserializeError, 
-    TransactionValidationError,
+    Transaction, TransactionDeserializeError, TransactionValidationError,
 };
+use crate::node::NodeState;
 use chrono::Utc;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use crate::node::NodeState;
 
 // pub type POSTFunc = fn(&POSTData, Arc<Mutex<NodeState>>) -> HTTPResult;
 // pub type GETFunc = fn(&GETData, Arc<Mutex<NodeState>>) -> HTTPResult;
@@ -75,7 +58,7 @@ pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTP
             }
         }
     };
-    
+
     state.lock().unwrap().transactions.push(transaction);
 
     Ok(HTTPResponse::OK(Some(Content::JSON(json!({
@@ -93,7 +76,7 @@ pub fn status(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
         Ok(guard) => guard,
         Err(_) => panic!("Mutex lock was poisoned in function status on endpoints"),
     };
-    
+
     return_json(json!({
         "status": state.status,
         "blockHeight": state.chain.get_last_index(),
@@ -104,7 +87,7 @@ pub fn status(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
 
 pub fn resolve_endpoint(
     state: Arc<Mutex<NodeState>>,
-    mut request: HTTPRequest
+    mut request: HTTPRequest,
 ) -> Result<Option<String>, Option<String>> {
     /*
     TODO: This creates the endpoints var every time the resolve_endpoints function runs,
@@ -115,15 +98,10 @@ pub fn resolve_endpoint(
 
     fn curry_add_endpoint<'a, 'b>(
         endpoints: &'b mut HashMap<&'a str, HashMap<&'a str, Box<dyn Handler>>>,
-    ) -> impl FnMut(&'a str, Option<GETFunc>, Option<POSTFunc>) + 'b  {
-        |
-            path: &'a str,
-            get: Option<GETFunc>,
-            post: Option<POSTFunc>,
-        | {
+    ) -> impl FnMut(&'a str, Option<GETFunc>, Option<POSTFunc>) + 'b {
+        |path: &'a str, get: Option<GETFunc>, post: Option<POSTFunc>| {
             let mut methods: HashMap<&'a str, Box<dyn Handler>> = HashMap::new();
             if let Some(get) = get {
-
                 methods.insert("GET", Box::new(get) as Box<dyn Handler>);
             }
             if let Some(post) = post {
@@ -138,14 +116,14 @@ pub fn resolve_endpoint(
         {
             let mut add_endpoints = curry_add_endpoint(&mut endpoints);
             add_endpoints("/", Some(index), None);
-            add_endpoints("/favicon", Some(favicon), None);
+            add_endpoints("/favicon.ico", Some(favicon), None);
             add_endpoints("/status", Some(status), None);
             add_endpoints("/submit-transaction", None, Some(submit_transaction));
         }
         endpoints
     }
 
-    let  endpoints = initialize_endpoints();
+    let endpoints = initialize_endpoints();
 
     let (path, method) = match request.get_method() {
         Method::GET(data) => (data.path.clone(), "GET"),
@@ -155,18 +133,22 @@ pub fn resolve_endpoint(
     let r = match endpoints.get(path.to_str().unwrap()) {
         Some(methods) => match methods.get(method) {
             Some(handler) => handler.call(&request, state),
-            None => method_not_allowed(),
+            None => method_not_allowed(Some(path.to_str().unwrap())),
         },
-        None => path_not_found(path.to_str().unwrap()),
+        None => path_not_found(Some(path.to_str().unwrap())),
     };
 
     match r {
         Ok(value) => {
             request.response(value);
+            let path = path.to_str().unwrap();
+            // I don't give a single fuck about favicon
+            if path == "/favicon.ico" {
+                return Ok(None);
+            }
             Ok(Some(format!(
                 "Request {} to path {} was successful",
-                method,
-                path.to_str().unwrap()
+                method, path
             )))
         }
         Err(e) => match e {
