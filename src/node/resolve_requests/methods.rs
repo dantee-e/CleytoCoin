@@ -1,4 +1,3 @@
-
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::prelude::*;
@@ -200,8 +199,7 @@ impl HTTPRequest {
                     Ok(Response::new(
                         400,
                         "text/html",
-                        fs::read("static/400.html")
-                            .unwrap_or_else(|_| b"400 Bad Request".to_vec()),
+                        fs::read("static/400.html").unwrap_or_else(|_| b"400 Bad Request".to_vec()),
                     ))
                 } else {
                     Ok(Response::new(

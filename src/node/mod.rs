@@ -1,15 +1,19 @@
 pub mod logger;
+pub mod ui;
 mod resolve_requests;
 mod thread_pool;
-pub mod ui;
 mod utils;
-
-use crate::chain::{transaction::Transaction, Chain};
+use crate::chain::{
+    transaction::Transaction,
+    Chain
+};
 use core::panic;
-use resolve_requests::methods::{HTTPParseError, HTTPRequest};
+use resolve_requests::methods::{
+    HTTPParseError, 
+    HTTPRequest
+};
 use std::time::Duration;
 use thread_pool::custom_thread_pool::ThreadPool;
-
 use std::path::PathBuf;
 use std::{
     collections::HashMap,
@@ -18,16 +22,22 @@ use std::{
     sync::{mpsc::Receiver, Arc, Mutex},
     thread,
 };
+use crate::node::logger::Logger;
+use once_cell::sync::Lazy;
+use resolve_requests::endpoints::resolve_endpoint;
 
-pub struct Node {
+
+pub struct NodeState {
+    status: bool,
     chain: Chain,
-    transactions_list: Vec<Transaction>,
+    transactions: Vec<Transaction>,
+}
+pub struct Node {
+    state: Arc<Mutex<NodeState>>,
     logger: Arc<logger::Logger>,
 }
 
-use crate::node::logger::Logger;
-use once_cell::sync::Lazy;
-use resolve_requests::endpoints::endpoints::resolve_endpoint;
+
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 
@@ -40,8 +50,11 @@ impl Node {
         num_cpus::get();
 
         Node {
-            chain,
-            transactions_list: Vec::new(),
+            state: Arc::new(Mutex::new(NodeState {
+                status: true,
+                chain,
+                transactions: Vec::new(),
+            })),
             logger,
         }
     }
@@ -150,7 +163,8 @@ impl Node {
         Err(HTTPParseError::InvalidStatusLine)
     }
 
-    fn handle_connection(stream: TcpStream) -> Result<Option<String>, Option<String>> {
+    fn handle_connection(state: Arc<Mutex<NodeState>>, stream: TcpStream) -> Result<Option<String>, 
+        Option<String>> {
         let buf_reader = BufReader::new(&stream);
 
         let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {
@@ -163,7 +177,7 @@ impl Node {
         request_object.set_stream(stream);
 
         // TODO add logging
-        resolve_endpoint(request_object)
+        resolve_endpoint(state, request_object)
     }
 
     pub fn run(&mut self, default: bool, rx: Arc<Mutex<Receiver<()>>>, selected_port: u16) {
@@ -203,9 +217,12 @@ impl Node {
             match listener.accept() {
                 Ok((stream, _)) => {
                     let logger = Arc::clone(&self.logger);
+                    let state = Arc::clone(&self.state);
                     thread_pool.execute(move || {
-                        match Self::handle_connection(stream) {
-                            Ok(Some(value)) => logger.log(format!("{value}")),
+                        match Self::handle_connection(state, stream) {
+                            Ok(Some(value)) => {
+                                logger.log(format!("{value}"));
+                            }
                             Err(Some(value)) => logger.log_error(format!("{value}")),
                             _ => {}
                         };

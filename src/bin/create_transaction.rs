@@ -35,7 +35,7 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
 
     // Send the POST request
     let response = client
-        .post("http://localhost:9473/submit-transactions")
+        .post("http://localhost:9473/submit-transaction")
         .header("Content-Type", "application/json")
         .body(json_content)
         .send()

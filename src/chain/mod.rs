@@ -33,7 +33,7 @@ impl Chain {
         }
     }
 
-    fn get_last_index(&mut self) -> u64 {
+    pub(crate) fn get_last_index(&mut self) -> u64 {
         match self.blocks.last() {
             Some(block) => block.get_index(),
             None => {

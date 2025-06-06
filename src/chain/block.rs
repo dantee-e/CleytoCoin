@@ -82,7 +82,7 @@ impl Block {
         Self {
             previous_hash: String::from("Foguete nao da re"),
             transactions: Vec::new(),
-            index: 0,
+            index: 1,
             timestamp: Utc::now(),
             hash: String::from(
                 "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
