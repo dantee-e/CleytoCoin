@@ -2,6 +2,7 @@ use chrono::prelude::Utc;
 use std::io::{self};
 use std::sync::Mutex;
 
+#[derive(Default)]
 pub struct Logger {
     logs: Mutex<Vec<String>>,
     temp_logs: Mutex<Vec<String>>,
@@ -35,12 +36,12 @@ impl Logger {
         let dt = Utc::now();
         self.log_internal(format!(
             "[ERROR] {} | {}",
-            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            dt.format("%Y-%m-%d %H:%M:%S"),
             log
         ));
         self.temp_log(format!(
             "[ERROR] {} | {}",
-            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            dt.format("%Y-%m-%d %H:%M:%S"),
             log
         ));
     }
@@ -48,12 +49,12 @@ impl Logger {
         let dt = Utc::now();
         self.log_internal(format!(
             "[LOG] {} | {}",
-            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            dt.format("%Y-%m-%d %H:%M:%S"),
             log
         ));
         self.temp_log(format!(
             "[LOG] {} | {}",
-            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            dt.format("%Y-%m-%d %H:%M:%S"),
             log
         ));
     }

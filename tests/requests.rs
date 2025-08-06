@@ -123,8 +123,6 @@ fn thread_get() {
         let url = url.to_string();
 
         let handle = thread::spawn(move || {
-            let body = format!(r#"{{"message": "Hello #{}"}}"#, i);
-
             match client
                 .get(&url)
                 .header("Content-Type", "application/json")

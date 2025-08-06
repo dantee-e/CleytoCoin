@@ -37,7 +37,7 @@ pub trait Handler {
 impl Handler for GETFunc {
     fn call(&self, request: &HTTPRequest, state: Arc<Mutex<NodeState>>) -> HTTPResult {
         match request.get_method() {
-            Method::GET(data) => self(&data, state),
+            Method::GET(data) => self(data, state),
             _ => method_not_allowed(None),
         }
     }
@@ -47,7 +47,7 @@ impl Handler for GETFunc {
 impl Handler for POSTFunc {
     fn call(&self, request: &HTTPRequest, state: Arc<Mutex<NodeState>>) -> HTTPResult {
         match request.get_method() {
-            Method::POST(data) => self(&data, state),
+            Method::POST(data) => self(data, state),
             _ => method_not_allowed(None),
         }
     }
@@ -68,29 +68,29 @@ pub fn return_json(json: serde_json::Value) -> HTTPResult {
     Ok(HTTPResponse::OK(Some(Content::JSON(json))))
 }
 
-pub fn post(request: HTTPRequest, f: POSTFunc, state: Arc<Mutex<NodeState>>) -> HTTPResult {
-    let method = request.get_method();
-    if let Method::POST(data) = method {
-        f(data, state)
-    } else {
-        Err(HTTPResponseError::InvalidMethod(None))
-    }
-}
-pub fn get(request: HTTPRequest, f: GETFunc, state: Arc<Mutex<NodeState>>) -> HTTPResult {
-    if let Method::GET(data) = request.get_method() {
-        f(data, state)
-    } else {
-        Err(HTTPResponseError::InvalidMethod(None))
-    }
-}
-pub fn get_post(
-    request: HTTPRequest,
-    get: GETFunc,
-    post: POSTFunc,
-    state: Arc<Mutex<NodeState>>,
-) -> HTTPResult {
-    match request.get_method() {
-        Method::POST(data) => post(data, state),
-        Method::GET(data) => get(data, state),
-    }
-}
+// pub fn post(request: HTTPRequest, f: POSTFunc, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+//     let method = request.get_method();
+//     if let Method::POST(data) = method {
+//         f(data, state)
+//     } else {
+//         Err(HTTPResponseError::InvalidMethod(None))
+//     }
+// }
+// pub fn get(request: HTTPRequest, f: GETFunc, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+//     if let Method::GET(data) = request.get_method() {
+//         f(data, state)
+//     } else {
+//         Err(HTTPResponseError::InvalidMethod(None))
+//     }
+// }
+// pub fn get_post(
+//     request: HTTPRequest,
+//     get: GETFunc,
+//     post: POSTFunc,
+//     state: Arc<Mutex<NodeState>>,
+// ) -> HTTPResult {
+//     match request.get_method() {
+//         Method::POST(data) => post(data, state),
+//         Method::GET(data) => get(data, state),
+//     }
+// }

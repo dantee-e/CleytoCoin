@@ -21,7 +21,7 @@ impl Block {
     }
 
     pub fn get_index(&self) -> u64 {
-        self.index.clone()
+        self.index
     }
 
     pub fn calculate_hash(&self) -> String {

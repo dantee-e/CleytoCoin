@@ -23,7 +23,7 @@ use thread_pool::custom_thread_pool::ThreadPool;
 pub struct NodeState {
     status: bool,
     chain: Chain,
-    transactions: Vec<Transaction>,
+    transactions_pool: Vec<Transaction>,
 }
 pub struct Node {
     state: Arc<Mutex<NodeState>>,
@@ -31,10 +31,10 @@ pub struct Node {
 }
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
+
 // 0 = None
 // 1 = Prod
 // 2 = Debug
-
 pub const LOG_LEVEL: u8 = 2;
 
 impl Node {
@@ -49,7 +49,7 @@ impl Node {
             state: Arc::new(Mutex::new(NodeState {
                 status: true,
                 chain,
-                transactions: Vec::new(),
+                transactions_pool: Vec::new(),
             })),
             logger,
         }
@@ -59,12 +59,10 @@ impl Node {
         mut buf_reader: BufReader<R>,
     ) -> Result<HTTPRequest, HTTPParseError> {
         let mut http_headers: HashMap<String, String> = HashMap::new();
-        let http_body: Option<String>;
 
         let mut line = String::new();
 
         // reading status_line
-        let status_line: String;
 
         match buf_reader.read_line(&mut line) {
             Ok(n) if (n > 0) => n,
@@ -72,7 +70,7 @@ impl Node {
             Err(_) => return Err(HTTPParseError::InvalidStatusLine),
         };
 
-        status_line = line.trim().to_string();
+        let status_line: String = line.trim().to_string();
 
         let mut tokens = status_line.split(' ');
         let (method, path, http_version) = (
@@ -94,7 +92,7 @@ impl Node {
         loop {
             line.clear();
 
-            if let Err(_) = buf_reader.read_line(&mut line) {
+            if buf_reader.read_line(&mut line).is_err() {
                 return Err(HTTPParseError::InvalidRequestLine);
             }
 
@@ -143,7 +141,7 @@ impl Node {
             return Err(HTTPParseError::InvalidRequestLine);
         }
 
-        http_body = Some(String::from_utf8_lossy(&body).to_string());
+        let http_body: Option<String> = Some(String::from_utf8_lossy(&body).to_string());
 
         if method == "POST" {
             return Ok(HTTPRequest::new(
@@ -179,18 +177,17 @@ impl Node {
     }
 
     pub fn run(&mut self, default: bool, rx: Arc<Mutex<Receiver<()>>>, selected_port: u16) {
-        let port: u16;
-        if default == true {
-            port = Self::DEFAULT_PORT;
+        let port: u16 = if default {
+            Self::DEFAULT_PORT
         } else {
-            port = match selected_port {
+            match selected_port {
                 port if (1..=65535).contains(&port) => port,
                 _ => {
                     println!("Invalid port! Using default: {}", Self::DEFAULT_PORT);
                     Self::DEFAULT_PORT
                 }
             }
-        }
+        };
 
         let listener = TcpListener::bind(format!("127.0.0.1:{port}")).unwrap();
 
@@ -206,7 +203,7 @@ impl Node {
         loop {
             // Check for termination signal
             if let Ok(lock) = rx.try_lock() {
-                if let Ok(_) = lock.try_recv() {
+                if lock.try_recv().is_ok() {
                     break;
                 }
             };
@@ -219,9 +216,9 @@ impl Node {
                     thread_pool.execute(move || {
                         match Self::handle_connection(state, stream) {
                             Ok(Some(value)) => {
-                                logger.log(format!("{value}"));
+                                logger.log(value);
                             }
-                            Err(Some(value)) => logger.log_error(format!("{value}")),
+                            Err(Some(value)) => logger.log_error(value),
                             _ => {}
                         };
                     })

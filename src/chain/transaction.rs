@@ -4,25 +4,24 @@ use openssl::error::ErrorStack;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Debug;
+use std::fmt::Display;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 // ---------------------------------------------- TransactionInfo definition -----------------------
 pub struct TransactionInfo {
-    pub value: f32,
+    pub value: i64,
     pub date: DateTime<Utc>,
 }
 
 impl TransactionInfo {
-    pub fn new(value: f32, date: DateTime<Utc>) -> TransactionInfo {
+    pub fn new(value: i64, date: DateTime<Utc>) -> TransactionInfo {
         Self { value, date }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        format!(
-            "VALUE::{}::TIME::{}",
-            self.value.to_string(),
-            self.date.to_string()
-        )
+impl Display for TransactionInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "VALUE::{}::TIME::{}", self.value, self.date)
     }
 }
 // -------------------------------------------------------------------------------------------------
@@ -104,7 +103,7 @@ impl Transaction {
 
         match transaction.verify() {
             Ok(()) => Ok(transaction),
-            Err(error) => return Err(error),
+            Err(error) => Err(error),
         }
     }
 
@@ -121,20 +120,8 @@ impl Transaction {
         }
     }
 
-    pub fn to_string(&self) -> String {
-        format!(
-            "SENDER::{:?}::RECEIVER::{:?}::{}::SIGNATURE::{:?}",
-            self.sender,
-            self.receiver.to_vec(),
-            self.transaction_info.to_string(),
-            self.signature
-        )
-    }
-
     pub fn serialize(&self) -> String {
-        let value = serde_json::to_string(self).unwrap();
-        // println!("serialized transaction: {value}");
-        value
+        serde_json::to_string(self).unwrap()
     }
     pub fn deserialize(json: String) -> Result<Transaction, TransactionDeserializeError> {
         let tx: Transaction = match serde_json::from_str(&json) {
@@ -142,10 +129,23 @@ impl Transaction {
             Err(e) => return Err(TransactionDeserializeError::SerdeError(e)),
         };
 
-        if tx.transaction_info.value <= 0.0 {
+        if tx.transaction_info.value < 1 {
             return Err(TransactionDeserializeError::InsufficientFunds);
         }
 
         Ok(tx)
+    }
+}
+
+impl Display for Transaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SENDER::{:?}::RECEIVER::{:?}::{}::SIGNATURE::{:?}",
+            self.sender,
+            self.receiver.to_vec(),
+            self.transaction_info,
+            self.signature
+        )
     }
 }

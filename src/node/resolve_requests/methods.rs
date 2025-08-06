@@ -5,17 +5,19 @@ use std::net::TcpStream;
 use std::path::PathBuf;
 use std::{fmt, fs};
 
+#[allow(clippy::upper_case_acronyms)]
 pub enum ImageType {
-    PNG,
+    // PNG,
     ICO,
-    JPEG,
+    // JPEG,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 pub enum Content {
     HTML(PathBuf), // path to HTML file
     JSON(serde_json::Value),
     Image(PathBuf, ImageType), // path to image file
-    PlainText(String),
+                               // PlainText(String),
 }
 
 pub enum HTTPResponse {
@@ -36,6 +38,7 @@ pub struct POSTData {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Method {
     GET(GETData),
     POST(POSTData),
@@ -138,17 +141,17 @@ impl HTTPRequest {
                 Content::Image(path, img_type) => Ok(Response {
                     status: 200,
                     content_type: match img_type {
-                        ImageType::PNG => "image/png",
+                        // ImageType::PNG => "image/png",
                         ImageType::ICO => "image/vnd.microsoft.icon",
-                        ImageType::JPEG => "image/jpeg",
+                        // ImageType::JPEG => "image/jpeg",
                     },
                     body: fs::read(path)?,
                 }),
-                Content::PlainText(text) => Ok(Response {
-                    status: 200,
-                    content_type: "text/plain",
-                    body: text.into_bytes(),
-                }),
+                // Content::PlainText(text) => Ok(Response {
+                //     status: 200,
+                //     content_type: "text/plain",
+                //     body: text.into_bytes(),
+                // }),
             }
         }
         fn response_ok_no_content(a: &str) -> std::io::Result<Response> {
@@ -271,14 +274,14 @@ impl fmt::Display for HTTPRequest {
 pub enum HTTPParseError {
     InvalidStatusLine,
     InvalidRequestLine,
-    MissingFields,
+    // MissingFields,
     MissingContentLength,
 }
 impl fmt::Display for HTTPParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             HTTPParseError::InvalidRequestLine => write!(f, "Invalid request line"),
-            HTTPParseError::MissingFields => write!(f, "Missing required fields"),
+            // HTTPParseError::MissingFields => write!(f, "Missing required fields"),
             HTTPParseError::InvalidStatusLine => write!(f, "Invalid status line"),
             HTTPParseError::MissingContentLength => {
                 write!(f, "Missing content-length field in headers")

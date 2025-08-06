@@ -7,36 +7,36 @@ use openssl::pkey::{PKey, Private, Public};
 use openssl::rsa::Rsa;
 use openssl::sign::{Signer, Verifier};
 
-fn test_sign() {
-    let rsa = Rsa::generate(2048).unwrap();
-    let pkey = PKey::from_rsa(rsa).unwrap();
-
-    // Data to be signed (this would normally be provided by the signer)
-    let data = b"hello, world!";
-
-    // Step 2: Sign the data with the private key (this would be done by the sender)
-    let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
-    signer.update(data).unwrap();
-    let signature = signer.sign_to_vec().unwrap();
-
-    // --- Now, we are at the verification step ---
-    // Step 3: Extract the public key from the PKey and use it for verification
-    let public_key = pkey.public_key_to_pem().unwrap(); // Extract public key in PEM format
-    let rsa_public = Rsa::public_key_from_pem(&public_key).unwrap(); // Convert back to Rsa
-    let pkey_public = PKey::from_rsa(rsa_public).unwrap(); // Create a PKey for public key
-
-    // Step 4: Verify the signature using the public key
-    let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey_public).unwrap();
-    verifier.update(data).unwrap();
-    let is_valid = verifier.verify(&signature).unwrap();
-
-    // Step 5: Check if the signature is valid
-    if is_valid {
-        println!("Signature is valid!");
-    } else {
-        println!("Signature is invalid.");
-    }
-}
+// fn test_sign() {
+//     let rsa = Rsa::generate(2048).unwrap();
+//     let pkey = PKey::from_rsa(rsa).unwrap();
+//
+//     // Data to be signed (this would normally be provided by the signer)
+//     let data = b"hello, world!";
+//
+//     // Step 2: Sign the data with the private key (this would be done by the sender)
+//     let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
+//     signer.update(data).unwrap();
+//     let signature = signer.sign_to_vec().unwrap();
+//
+//     // --- Now, we are at the verification step ---
+//     // Step 3: Extract the public key from the PKey and use it for verification
+//     let public_key = pkey.public_key_to_pem().unwrap(); // Extract public key in PEM format
+//     let rsa_public = Rsa::public_key_from_pem(&public_key).unwrap(); // Convert back to Rsa
+//     let pkey_public = PKey::from_rsa(rsa_public).unwrap(); // Create a PKey for public key
+//
+//     // Step 4: Verify the signature using the public key
+//     let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey_public).unwrap();
+//     verifier.update(data).unwrap();
+//     let is_valid = verifier.verify(&signature).unwrap();
+//
+//     // Step 5: Check if the signature is valid
+//     if is_valid {
+//         println!("Signature is valid!");
+//     } else {
+//         println!("Signature is invalid.");
+//     }
+// }
 
 // ---------------------------------------------- WalletPK definition ----------------------------------------------
 #[derive(Debug)]
@@ -51,7 +51,7 @@ impl WalletPK {
     ) -> Result<Vec<u8>, ErrorStack> {
         let mut signer = Signer::new(MessageDigest::sha256(), &self.private_key)?;
         signer.update(transaction_info.to_string().as_bytes())?;
-        Ok(signer.sign_to_vec()?)
+        signer.sign_to_vec()
     }
 }
 // -----------------------------------------------------------------------------------------------------------------
@@ -83,7 +83,7 @@ impl Wallet {
         let public_key = self.to_pkey();
         let mut verifier = Verifier::new(MessageDigest::sha256(), &public_key)?;
         verifier.update(transaction_info.to_string().as_bytes())?;
-        Ok(verifier.verify(&signature)?)
+        verifier.verify(signature)
     }
 
     #[allow(unused)]

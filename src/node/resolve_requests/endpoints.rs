@@ -60,12 +60,18 @@ pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTP
         }
     };
 
-    state.lock().unwrap().transactions.push(transaction);
+    state.lock().unwrap().transactions_pool.push(transaction);
 
     Ok(HTTPResponse::OK(Some(Content::JSON(json!({
         "msg": "The transaction was added to the pool.",
         "status_code": "200"
     })))))
+}
+
+pub fn get_transaction_pool(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+    let transaction_pool: Vec<Transaction> = state.lock().unwrap().transactions_pool.clone();
+    let response = serde_json::to_value(transaction_pool).unwrap();
+    Ok(HTTPResponse::OK(Some(Content::JSON(response))))
 }
 
 pub fn favicon(_: &GETData, _: Arc<Mutex<NodeState>>) -> HTTPResult {
@@ -81,7 +87,7 @@ pub fn status(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
     return_json(json!({
         "status": state.status,
         "blockHeight": state.chain.get_last_index(),
-        "peers": 8,
+        "peers": 100000000,
         "timestamp": Utc::now()
     }))
 }
@@ -120,6 +126,7 @@ pub fn resolve_endpoint(
             add_endpoints("/favicon.ico", Some(favicon), None);
             add_endpoints("/status", Some(status), None);
             add_endpoints("/submit-transaction", None, Some(submit_transaction));
+            add_endpoints("/get-transaction-pool", Some(get_transaction_pool), None);
         }
         endpoints
     }

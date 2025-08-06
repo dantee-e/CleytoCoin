@@ -4,6 +4,7 @@ pub mod utils;
 pub mod wallet;
 use block::Block;
 
+#[derive(Default)]
 pub struct Chain {
     blocks: Vec<block::Block>,
 }

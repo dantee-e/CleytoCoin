@@ -67,7 +67,7 @@ pub mod custom_thread_pool {
         pub fn new(size: usize) -> Result<ThreadPool, PoolCreationError> {
             if size < 1 {
                 return Err(PoolCreationError::TooFewThreads);
-            } else if size > usize::MAX {
+            } else if size > 100 {
                 // I think this is unreachable
                 return Err(PoolCreationError::TooManyThreads);
             }

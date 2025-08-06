@@ -12,7 +12,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// The main application which holds the state and logic of the application.
-
 pub struct App {
     /// Is the application running?
     running: bool,
