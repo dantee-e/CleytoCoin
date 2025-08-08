@@ -49,7 +49,7 @@ impl Block {
         ))
         .expect("Coudn't serialize the block to create the hash");
 
-        println!("behold the serialized block:\n{serialized}");
+        // println!("behold the serialized block:\n{serialized}");
 
         let mut hasher = Sha256::new();
         hasher.update(serialized.as_bytes());

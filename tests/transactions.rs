@@ -33,7 +33,7 @@ fn create_transaction() {
     println!("transaction.to_string(): {}", transaction);
 }
 
-#[test] //mark a function as a test.
+#[test]
 fn test_transaction_info_creation() {
     let transaction: TransactionInfo = TransactionInfo::new(123452, Utc::now());
     println!("transaction info:\n{}", transaction);
