@@ -1,11 +1,12 @@
 use chrono::{DateTime, Utc};
-use sha2::{Digest, Sha256};
+use openssl::hash::{Hasher, MessageDigest};
+use serde::{Deserialize, Serialize};
 
 use super::transaction::Transaction;
 use super::utils::PROOF_OF_WORK_DIFFICULTY;
 use super::Chain;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Block {
     previous_hash: String,
     transactions: Vec<Transaction>,
@@ -24,20 +25,82 @@ impl Block {
         self.index
     }
 
+    /// This merkle tree does not work the same way as the bitcoin core one. If the number of
+    /// leaves is not a power of two, it copies the last transaction's hash until we have enough
+    /// leaves for a binary tree, and then it collapses the tree into the root, which is then
+    /// returned.
+    fn calculate_merkle_root(transactions: &[Transaction]) -> [u8; 32] {
+        // This gets the closest bigger power of 2
+        let log_2 = f32::log2(transactions.len() as f32);
+        let mut closest_log_2: u32 = log_2 as u32;
+        if log_2 > closest_log_2 as f32 {
+            closest_log_2 += 1;
+        }
+        let mut closest_pow_2 = 2usize.pow(closest_log_2);
+
+        // Runs first time to populate the hash_vec with the hash of all transactions
+        let mut hash_vec = (0..closest_pow_2)
+            .map(|i| {
+                let transaction_hash = {
+                    let transaction = match transactions.get(i) {
+                        Some(transaction) => transaction,
+                        None => transactions.last().unwrap(),
+                    };
+                    transaction.txid
+                };
+                transaction_hash
+            })
+            .collect::<Vec<[u8; 32]>>();
+
+        // Fuck recursion
+        let result: [u8; 32];
+        loop {
+            if closest_pow_2 == 1 {
+                result = hash_vec[0];
+                break;
+            }
+
+            for i in (0..closest_pow_2).step_by(2) {
+                // gets either the hashes in the right index or the last hash on the hash_vec
+                let (hash_1, hash_2) = {
+                    (
+                        match hash_vec.get(i) {
+                            Some(hash) => hash,
+                            None => hash_vec.last().unwrap(),
+                        },
+                        match hash_vec.get(i + 1) {
+                            Some(hash) => hash,
+                            None => hash_vec.last().unwrap(),
+                        },
+                    )
+                };
+                let mut hasher = Hasher::new(MessageDigest::sha256()).unwrap();
+                hasher.update(hash_1).unwrap();
+                hasher.update(hash_2).unwrap();
+                hash_vec[i / 2] = hasher.finish().unwrap().as_ref().try_into().unwrap();
+            }
+            closest_pow_2 /= 2;
+        }
+        result
+    }
+
     pub fn calculate_hash(&self) -> String {
-        let transactions_string = self
-            .transactions
-            .iter()
-            .map(|t| t.to_string()) // Calls the `to_string()` method of `Transaction`
-            .collect::<Vec<String>>() // Collects into a Vec<String>
-            .join("::END_OF_TRANSACTION::BEGIN_OF_TRANSACTION::"); // Joins all elements with "; " as separator
+        //This here should be replaced by the calculation of the merkle tree
+        // let transactions_string = self
+        //     .transactions
+        //     .iter()
+        //     .map(|t| t.to_string()) // Calls the `to_string()` method of `Transaction`
+        //     .collect::<Vec<String>>() // Collects into a Vec<String>
+        //     .join("::END_OF_TRANSACTION::BEGIN_OF_TRANSACTION::"); // Joins all elements with "; " as separator
+
+        let merkle_root = Self::calculate_merkle_root(&self.transactions);
 
         let serialized = serde_json::to_string(&(
             "BEGIN::BEGIN_PREVIOUS_HASH::",
             &self.previous_hash,
             "::END_PREVIOUS_HASH::BEGIN_TRANSACTIONS::",
             "BEGIN_OF_TRANSACTION::",
-            transactions_string,
+            merkle_root,
             "::END_OF_TRANSACTION",
             "::END_TRANSACTIONS::BEGIN_INDEX::",
             &self.index,
@@ -51,11 +114,10 @@ impl Block {
 
         // println!("behold the serialized block:\n{serialized}");
 
-        let mut hasher = Sha256::new();
-        hasher.update(serialized.as_bytes());
-        let result = hasher.finalize();
-        let encoded_result = hex::encode(result);
-        println!("Hash = {encoded_result}");
+        let mut hasher = Hasher::new(MessageDigest::sha256()).unwrap();
+        hasher.update(serialized.as_bytes()).unwrap();
+        let result = hasher.finish().unwrap();
+
         hex::encode(result) // Converts bytes to a hex string
     }
 

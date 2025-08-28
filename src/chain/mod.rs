@@ -3,8 +3,9 @@ pub mod transaction;
 pub mod utils;
 pub mod wallet;
 use block::Block;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Chain {
     blocks: Vec<block::Block>,
 }
@@ -24,7 +25,7 @@ impl Chain {
         genesis
     }
 
-    fn get_last_hash(&mut self) -> String {
+    pub fn get_last_hash(&mut self) -> String {
         match self.blocks.last() {
             Some(block) => block.get_hash(),
             None => {
@@ -34,7 +35,7 @@ impl Chain {
         }
     }
 
-    pub(crate) fn get_last_index(&mut self) -> u64 {
+    pub fn get_last_index(&mut self) -> u64 {
         match self.blocks.last() {
             Some(block) => block.get_index(),
             None => {

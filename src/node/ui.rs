@@ -63,9 +63,7 @@ impl App {
 
         let text = format!(
             "Node running in port {port}
-            \n\nPress `Esc`, `Ctrl-C` or `q` to stop running.\n
-            lines size is {}",
-            lines.len()
+            \n\nPress `Esc`, `Ctrl-C` or `q` to stop running.\n"
         );
 
         frame.render_widget(

@@ -1,4 +1,3 @@
-use chrono::Utc;
 use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
 use cleyto_coin::chain::wallet::Wallet;
 use cleyto_coin::node;
@@ -8,7 +7,6 @@ use std::{
 };
 
 use cleyto_coin::chain::Chain;
-use cleyto_coin::node::logger::Logger;
 use reqwest::blocking::Client;
 
 fn thread_post(n: u16) {
@@ -17,10 +15,10 @@ fn thread_post(n: u16) {
 
     let mut handles = vec![];
 
-    let (wallet1, mut wallet1_pk) = Wallet::new();
+    let (wallet1, wallet1_pk) = Wallet::new();
     let (wallet2, _) = Wallet::new();
 
-    let transaction_info = TransactionInfo::new(105, Utc::now());
+    let transaction_info = TransactionInfo::new(105);
 
     let signature = match wallet1_pk.sign_transaction(&transaction_info) {
         Ok(value) => value,
@@ -105,7 +103,7 @@ fn main() {
     // Run server thread
     let server = thread::spawn(move || {
         let rx = Arc::clone(&rx);
-        let mut node = node::Node::new(Chain::new(), Arc::new(Logger::new()));
+        let (mut node, _) = node::Node::new(Chain::new());
         node.run(true, rx, 0);
     });
 

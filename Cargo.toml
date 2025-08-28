@@ -15,7 +15,7 @@ sha2 = "0.10"
 rand = "0.9.0"
 hex = "0.4.3"
 chrono = { version="0.4.40", features = ["serde"] }
-serde = { version="1.0.219", features = ["derive"] }
+serde = { version="1.0.219", features = ["derive", "rc"] }
 serde_json = "1.0.140"
 reqwest = { version = "0.12.15", features = ["blocking", "json"] }
 num_cpus = "1.16.0"
@@ -26,4 +26,7 @@ ratatui = "0.29.0"
 color-eyre = "0.6.3"
 tokio = { version = "1.44.1", features = ["rt", "rt-multi-thread", "macros"] }
 futures = "0.3.31"
+directories = "6.0.0"
+toml = "0.9.5"
+structopt = "0.3.26"
 

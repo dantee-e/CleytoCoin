@@ -1,6 +1,7 @@
 use super::wallet::Wallet;
 use chrono::{DateTime, Utc};
 use openssl::error::ErrorStack;
+use openssl::sha::Sha256;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Debug;
@@ -14,7 +15,8 @@ pub struct TransactionInfo {
 }
 
 impl TransactionInfo {
-    pub fn new(value: i64, date: DateTime<Utc>) -> TransactionInfo {
+    pub fn new(value: i64) -> TransactionInfo {
+        let date = Utc::now();
         Self { value, date }
     }
 }
@@ -85,6 +87,7 @@ pub struct Transaction {
     pub receiver: Wallet,
     pub signature: Vec<u8>,
     pub transaction_info: TransactionInfo,
+    pub txid: [u8; 32],
 }
 
 impl Transaction {
@@ -94,12 +97,19 @@ impl Transaction {
         transaction_info: TransactionInfo,
         signature: Vec<u8>,
     ) -> Result<Self, TransactionValidationError> {
-        let transaction = Self {
+        let mut transaction = Self {
             sender,
             receiver,
             signature,
             transaction_info,
+            txid: [0; 32], // This could be optimized by avoiding the creation of this Vec, which
+                           // serves no function on its own, but I don't really see that being a problem
         };
+
+        let to_hash = transaction.to_string();
+        let mut hasher: Sha256 = Sha256::new();
+        hasher.update(to_hash.as_bytes());
+        transaction.txid = hasher.finish().to_owned();
 
         match transaction.verify() {
             Ok(()) => Ok(transaction),
@@ -143,7 +153,7 @@ impl Display for Transaction {
             f,
             "SENDER::{:?}::RECEIVER::{:?}::{}::SIGNATURE::{:?}",
             self.sender,
-            self.receiver.to_vec(),
+            self.receiver.to_pem(),
             self.transaction_info,
             self.signature
         )

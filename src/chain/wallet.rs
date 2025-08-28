@@ -1,42 +1,12 @@
 use super::transaction::TransactionInfo;
 use openssl::error::ErrorStack;
-use serde::{Deserialize, Serialize};
 
 use openssl::hash::MessageDigest;
 use openssl::pkey::{PKey, Private, Public};
 use openssl::rsa::Rsa;
 use openssl::sign::{Signer, Verifier};
-
-// fn test_sign() {
-//     let rsa = Rsa::generate(2048).unwrap();
-//     let pkey = PKey::from_rsa(rsa).unwrap();
-//
-//     // Data to be signed (this would normally be provided by the signer)
-//     let data = b"hello, world!";
-//
-//     // Step 2: Sign the data with the private key (this would be done by the sender)
-//     let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
-//     signer.update(data).unwrap();
-//     let signature = signer.sign_to_vec().unwrap();
-//
-//     // --- Now, we are at the verification step ---
-//     // Step 3: Extract the public key from the PKey and use it for verification
-//     let public_key = pkey.public_key_to_pem().unwrap(); // Extract public key in PEM format
-//     let rsa_public = Rsa::public_key_from_pem(&public_key).unwrap(); // Convert back to Rsa
-//     let pkey_public = PKey::from_rsa(rsa_public).unwrap(); // Create a PKey for public key
-//
-//     // Step 4: Verify the signature using the public key
-//     let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey_public).unwrap();
-//     verifier.update(data).unwrap();
-//     let is_valid = verifier.verify(&signature).unwrap();
-//
-//     // Step 5: Check if the signature is valid
-//     if is_valid {
-//         println!("Signature is valid!");
-//     } else {
-//         println!("Signature is invalid.");
-//     }
-// }
+use openssl::symm::Cipher;
+use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------- WalletPK definition ----------------------------------------------
 #[derive(Debug)]
@@ -46,31 +16,96 @@ pub struct WalletPK {
 
 impl WalletPK {
     pub fn sign_transaction(
-        &mut self,
+        &self,
         transaction_info: &TransactionInfo,
     ) -> Result<Vec<u8>, ErrorStack> {
         let mut signer = Signer::new(MessageDigest::sha256(), &self.private_key)?;
-        signer.update(transaction_info.to_string().as_bytes())?;
-        signer.sign_to_vec()
+        signer.sign_oneshot_to_vec(transaction_info.to_string().as_bytes())
+    }
+    pub fn to_pem_with_password(&self, password: String) -> Vec<u8> {
+        self.private_key
+            .private_key_to_pem_pkcs8_passphrase(Cipher::aes_256_cbc(), password.as_bytes())
+            .unwrap()
+    }
+    pub fn to_pem(&self) -> Vec<u8> {
+        self.private_key.private_key_to_pem_pkcs8().unwrap()
+    }
+    pub fn public_wallet(&self) -> Wallet {
+        let public_key = PKey::public_key_from_pem(
+            &self
+                .private_key
+                .public_key_to_pem()
+                .expect("Could not extract Publick Key from Private Key"),
+        )
+        .unwrap();
+
+        Wallet { public_key }
     }
 }
+impl From<PKey<Private>> for WalletPK {
+    fn from(private_key: PKey<Private>) -> Self {
+        Self { private_key }
+    }
+}
+
 // -----------------------------------------------------------------------------------------------------------------
 
 // ---------------------------------------------- Wallet definition ------------------------------------------------
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Wallet {
-    public_key: Vec<u8>,
+    public_key: PKey<Public>, // Should I store this as PEM or as PKey<Public>?
 }
 
+impl<'de> Deserialize<'de> for Wallet {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bytes: Vec<u8> = Deserialize::deserialize(deserializer)?;
+        let public_key = PKey::public_key_from_pem(&bytes).map_err(serde::de::Error::custom)?;
+        Ok(Wallet { public_key })
+    }
+}
+
+impl Serialize for Wallet {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let pem = self
+            .public_key
+            .public_key_to_pem()
+            .map_err(serde::ser::Error::custom)?;
+        serializer.serialize_bytes(&pem)
+    }
+}
+
+impl From<String> for Wallet {
+    fn from(value: String) -> Self {
+        let public_rsa = openssl::rsa::Rsa::public_key_from_pem(value.as_bytes())
+            .expect("Could not read the public key");
+        let public_key =
+            PKey::from_rsa(public_rsa).expect("Error converting from RSA to PKey<Public>");
+        Self { public_key }
+    }
+}
+impl From<PKey<Public>> for Wallet {
+    fn from(public_key: PKey<Public>) -> Self {
+        Self { public_key }
+    }
+}
 impl Wallet {
     pub fn new() -> (Self, WalletPK) {
         let bits: u32 = 2048;
         let rsa = Rsa::generate(bits).unwrap();
         let private_key = PKey::from_rsa(rsa).unwrap();
 
-        let public_key = private_key
-            .public_key_to_pem()
-            .expect("Error extracting public key from private key");
+        let public_key = PKey::public_key_from_pem(
+            &private_key
+                .public_key_to_pem()
+                .expect("Could not extract Publick Key from Private Key"),
+        )
+        .unwrap();
 
         (Wallet { public_key }, WalletPK { private_key })
     }
@@ -80,22 +115,13 @@ impl Wallet {
         transaction_info: &TransactionInfo,
         signature: &[u8],
     ) -> Result<bool, ErrorStack> {
-        let public_key = self.to_pkey();
-        let mut verifier = Verifier::new(MessageDigest::sha256(), &public_key)?;
+        let mut verifier = Verifier::new(MessageDigest::sha256(), &self.public_key)?;
         verifier.update(transaction_info.to_string().as_bytes())?;
         verifier.verify(signature)
     }
 
-    #[allow(unused)]
-    pub fn to_pkey(&self) -> PKey<Public> {
-        let rsa_public = Rsa::public_key_from_pem(&self.public_key)
-            .expect("Error extracting Rsa<Public> object from public key");
-        PKey::from_rsa(rsa_public)
-            .expect("Error extracting PKey<Public> object from Rsa<Public> object")
-    }
-
-    pub fn to_vec(&self) -> Vec<u8> {
-        self.public_key.clone()
+    pub fn to_pem(&self) -> Vec<u8> {
+        self.public_key.public_key_to_pem().unwrap()
     }
 }
 // -----------------------------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# CleytoCoin 
+# CleytoCoin
 
 ## Table of Contents
 
@@ -11,9 +11,10 @@
 - [Testing](#testing)
 - [Contributing](#contributing)
 
-# CleytoCoin is still under development, so many of the features listed underneath aren't yet functional.
+# CleytoCoin is still under development, so many of the features listed underneath aren't yet functional
+
 We appreciate the interest and are working towards making CleytoCoin a functional and reliable cryptocurrency, but currently it's still in it's early development stages.
-Feel free to give sugestions in the meantime of what you'd like to see implemented in our project!
+Feel free to give suggestions in the meantime of what you'd like to see implemented in our project!
 
 ## About
 
@@ -43,62 +44,86 @@ Ensure you have the following dependencies installed on your machine:
 Clone this repository to your local machine:
 
 ```bash
-$ git clone https://github.com/dantee-e/CleytoCoin.git
-$ cd CleytoCoin 
+git clone https://github.com/dantee-e/CleytoCoin.git
+cd CleytoCoin
 ```
+
 To build and install the project:
-``` bash
-$ cargo build --release
+
+```bash
+cargo build --release
 ```
+
 This will compile the project and generate an optimized binary in the `target/release` directory.
 
 ## Usage
 
 ### Starting the node
+
 To start the cryptocurrency node, use the following command:
-``` bash
-cargo run --bin cleyto_coin
+
+```bash
+cargo run --bin node
 ```
-The node will start and connect to the network. You can start mining or send/receive transactions.
+
+The node will start and connect to the network. For now, only full nodes are available and they don't have yet the capacity for mining
 
 ### Creating a wallet
+
 To generate a new wallet, run the following:
-``` bash
-cargo run --bin cleyto_coin-wallet generate
+
+```bash
+cargo run --bin cleyto-coin-wallet generate
 ```
+
 This will generate a private key and address for your wallet.
 
 ### Sending a transaction
+
 To send a transaction, use the following command:
-``` bash
-cargo run --bin cleyto_coin-wallet send --to <recipient_address> --amount <amount> --private-key <your_private_key>
+
+```bash
+cargo run --bin cleyto-coin-wallet send --to <recipient_address> --amount <amount> --private-key <your_private_key>
 ```
 
-### Mining
+### Mining (not yet implemented)
+
 Start mining by running:
-``` bash
-cargo run --bin cleyto_coin-miner start --mining-key <your_private_key>
+
+```bash
+cargo run --bin cleyto-coin-miner start --mining-key <your_private_key>
 ```
 
 ### Stopping the node
-To stop the node, press `CTRL+C` or run the following:
-``` bash
-cargo run --bin cleyto_coin stop
+
+To stop the node, on the terminal window running your server, press `CTRL+C`, `q` or `Esc`
+
+**Running the server without the GUI is not yet implemented**
+If you ran it without the GUI, use the command
+
+```bash
+cargo run --bin cleyto-coin stop # Not yet implemented
 ```
 
 ## Testing
+
 To run the tests for the project, use the following command:
-``` bash
+
+```bash
 cargo test
 ```
+
 This will run all unit tests, integration tests, and any other tests defined in this project.
 If you wish to run with output run:
-``` bash
+
+```bash
 cargo test -- --nocapture
 ```
 
 ## Contributing
+
 We welcome contributions to the CleytoCoin project. If you have an idea or find a bug, please feel free to submit an issue or a pull request.
+
 1. Fork the repository
 2. Create a new branch (`git checkout -b feature/feature-name`)
 3. Make your changes

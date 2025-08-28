@@ -6,9 +6,12 @@ mod utils;
 use crate::chain::{transaction::Transaction, Chain};
 use crate::node::logger::Logger;
 use core::panic;
+use directories::ProjectDirs;
 use once_cell::sync::Lazy;
 use resolve_requests::endpoints::resolve_endpoint;
 use resolve_requests::methods::{HTTPParseError, HTTPRequest};
+use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{
@@ -20,14 +23,24 @@ use std::{
 };
 use thread_pool::custom_thread_pool::ThreadPool;
 
+#[derive(Serialize, Deserialize)]
 pub struct NodeState {
     status: bool,
     chain: Chain,
     transactions_pool: Vec<Transaction>,
 }
+#[derive(Debug, Deserialize, Default)]
+struct NodeConfig {
+    log_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Node {
     state: Arc<Mutex<NodeState>>,
+    #[serde(skip)] // The logs are manually saved on shutdown and reloaded on initialization
     logger: Arc<logger::Logger>,
+    #[serde(skip)] // The configs are best reloaded with every initialization
+    config: NodeConfig,
 }
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
@@ -37,22 +50,44 @@ static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 // 2 = Debug
 pub const LOG_LEVEL: u8 = 2;
 
+fn load_config() -> NodeConfig {
+    let proj_dirs = ProjectDirs::from("", "CleytoCoin Big Mean Corp", "cleyto_coin")
+        .expect("Could not find the config directory");
+    let config_path: PathBuf = proj_dirs.config_dir().join("config.toml");
+
+    let contents = fs::read_to_string(&config_path).unwrap_or_else(|_| {
+        fs::create_dir_all(proj_dirs.config_dir())
+            .expect("Could not create the necessaty directories");
+        let log_path = proj_dirs.data_dir().join("logs.log");
+        let contents = format!(r#"log_path = "{}""#, log_path.to_str().unwrap());
+        fs::write(&config_path, &contents).expect("Couldn't write to file");
+        contents
+    });
+    toml::from_str(&contents).expect("Invalid config format")
+}
+
 impl Node {
     // these configurations should be moved to a file
     pub const DEFAULT_PORT: u16 = 9473;
     pub const REFRESH_RATE_SERVER_IN_MS: u64 = 50;
 
-    pub fn new(chain: Chain, logger: Arc<Logger>) -> Node {
-        num_cpus::get();
-
-        Node {
-            state: Arc::new(Mutex::new(NodeState {
-                status: true,
-                chain,
-                transactions_pool: Vec::new(),
-            })),
-            logger,
-        }
+    pub fn new(chain: Chain) -> (Node, Arc<Logger>) {
+        let config = load_config();
+        let logger =
+            Arc::new(Logger::read_logs_file(&config.log_path).unwrap_or_else(|_| Logger::new()));
+        let logger_clone = Arc::clone(&logger);
+        (
+            Node {
+                state: Arc::new(Mutex::new(NodeState {
+                    status: true,
+                    chain,
+                    transactions_pool: Vec::new(),
+                })),
+                logger,
+                config,
+            },
+            logger_clone,
+        )
     }
 
     fn parse_http_request<R: Read>(
@@ -234,7 +269,14 @@ impl Node {
         }
 
         println!("Dropping thread pool");
+    }
+}
 
-        drop(thread_pool);
+impl Drop for Node {
+    fn drop(&mut self) {
+        match self.logger.write_logs_file(&self.config.log_path) {
+            Ok(_) => {}
+            Err(e) => eprintln!("Error saving log file: {e:?}"),
+        }
     }
 }

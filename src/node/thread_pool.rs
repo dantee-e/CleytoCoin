@@ -65,7 +65,7 @@ pub mod custom_thread_pool {
         ///
         /// The `new` function will panic if the size is zero.
         pub fn new(size: usize) -> Result<ThreadPool, PoolCreationError> {
-            println!("number of threads in thread pool is {}", size);
+            // println!("number of threads in thread pool is {}", size);
             if size < 1 {
                 return Err(PoolCreationError::TooFewThreads);
             } else if size > 100000 {

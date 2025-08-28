@@ -1,12 +1,11 @@
-use chrono::Utc;
 use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
 use cleyto_coin::chain::wallet::Wallet;
 
 #[test]
 fn create_transaction() {
-    let (wallet_sender, mut walletpk_sender) = Wallet::new();
+    let (wallet_sender, walletpk_sender) = Wallet::new();
     let (wallet_receiver, _) = Wallet::new();
-    let transactioninfo: TransactionInfo = TransactionInfo::new(12345, Utc::now());
+    let transactioninfo: TransactionInfo = TransactionInfo::new(12345);
 
     let signature = match walletpk_sender.sign_transaction(&transactioninfo) {
         Ok(signed_hashed_message) => signed_hashed_message,
@@ -35,15 +34,15 @@ fn create_transaction() {
 
 #[test]
 fn test_transaction_info_creation() {
-    let transaction: TransactionInfo = TransactionInfo::new(123452, Utc::now());
+    let transaction: TransactionInfo = TransactionInfo::new(123452);
     println!("transaction info:\n{}", transaction);
     println!("{:?}", transaction);
 }
 
 #[test]
 fn sign_and_verify_transaction_info() {
-    let (wallet, mut wallet_pk) = Wallet::new();
-    let transactioninfo: TransactionInfo = TransactionInfo::new(1234532, Utc::now());
+    let (wallet, wallet_pk) = Wallet::new();
+    let transactioninfo: TransactionInfo = TransactionInfo::new(1234532);
 
     let signature = match wallet_pk.sign_transaction(&transactioninfo) {
         Ok(signed_hashed_message) => signed_hashed_message,
@@ -66,9 +65,9 @@ fn sign_and_verify_transaction_info() {
 
 #[test]
 fn serialize_and_deserialize_transaction() {
-    let (wallet, mut wallet_pk) = Wallet::new();
+    let (wallet, wallet_pk) = Wallet::new();
     let (mallet, _) = Wallet::new();
-    let transactioninfo: TransactionInfo = TransactionInfo::new(1234552, Utc::now());
+    let transactioninfo: TransactionInfo = TransactionInfo::new(1234552);
 
     let signature = match wallet_pk.sign_transaction(&transactioninfo) {
         Ok(signed_hashed_message) => signed_hashed_message,
