@@ -108,8 +108,9 @@ fn main() {
     });
 
     // 10.000 breaks the os (client), but the server seems fine
-    thread_get(1000);
-    thread_post(1000);
+    // Error accepting connection: Too many open files (os error 24)
+    thread_get(10);
+    thread_post(10);
 
     tx.send(()).expect("Failed to send termination signal.");
 
