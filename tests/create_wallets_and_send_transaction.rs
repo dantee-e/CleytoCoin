@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use cleyto_coin::{generate, kill_server, run_server, send};
+use cleyto_coin::{generate, kill_server, run_server_thread, send};
 
 const SENDER_PUBLIC_KEY_PATH: &str = "./wallets/sender/public.pem";
 const SENDER_PRIVATE_KEY_PATH: &str = "./wallets/sender/private.pem";
@@ -33,7 +33,7 @@ async fn test_send_transaction() {
 
     let receiver_public_key_file = PathBuf::from(RECEIVER_PUBLIC_KEY_PATH);
 
-    let tx = run_server();
+    run_server_thread();
 
     send(
         None,
@@ -45,5 +45,5 @@ async fn test_send_transaction() {
     )
     .await;
 
-    kill_server(tx);
+    kill_server();
 }

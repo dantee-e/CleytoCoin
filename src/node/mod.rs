@@ -4,6 +4,7 @@ mod thread_pool;
 pub mod ui;
 mod utils;
 use crate::chain::{transaction::Transaction, Chain};
+use crate::configs::KILL_SERVER_SOCKET_PATH;
 use crate::node::logger::Logger;
 use core::panic;
 use directories::ProjectDirs;
@@ -11,14 +12,15 @@ use once_cell::sync::Lazy;
 use resolve_requests::endpoints::resolve_endpoint;
 use resolve_requests::methods::{HTTPParseError, HTTPRequest};
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self};
+use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{
     collections::HashMap,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
-    sync::{mpsc::Receiver, Arc, Mutex},
+    sync::{Arc, Mutex},
     thread,
 };
 use thread_pool::custom_thread_pool::ThreadPool;
@@ -29,9 +31,20 @@ pub struct NodeState {
     chain: Chain,
     transactions_pool: Vec<Transaction>,
 }
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize)]
 struct NodeConfig {
     log_path: PathBuf,
+    socket_path: PathBuf,
+}
+impl Default for NodeConfig {
+    fn default() -> Self {
+        let proj_dirs = ProjectDirs::from("", "CleytoCoin Big Mean Corp", "cleyto_coin")
+            .expect("Could not find the config directory");
+        Self {
+            log_path: proj_dirs.data_dir().join("logs.log"),
+            socket_path: PathBuf::from(KILL_SERVER_SOCKET_PATH),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -53,17 +66,18 @@ pub const LOG_LEVEL: u8 = 2;
 fn load_config() -> NodeConfig {
     let proj_dirs = ProjectDirs::from("", "CleytoCoin Big Mean Corp", "cleyto_coin")
         .expect("Could not find the config directory");
-    let config_path: PathBuf = proj_dirs.config_dir().join("config.toml");
+    let config_path = proj_dirs.config_dir().join("config.toml");
 
-    let contents = fs::read_to_string(&config_path).unwrap_or_else(|_| {
-        fs::create_dir_all(proj_dirs.config_dir())
-            .expect("Could not create the necessaty directories");
-        let log_path = proj_dirs.data_dir().join("logs.log");
-        let contents = format!(r#"log_path = "{}""#, log_path.to_str().unwrap());
-        fs::write(&config_path, &contents).expect("Couldn't write to file");
-        contents
-    });
-    toml::from_str(&contents).expect("Invalid config format")
+    if let Ok(contents) = fs::read_to_string(&config_path) {
+        toml::from_str(&contents).expect("Invalid config format")
+    } else {
+        fs::create_dir_all(proj_dirs.config_dir()).expect("Could not create config directories");
+
+        let default_cfg = NodeConfig::default();
+        let toml_str = toml::to_string_pretty(&default_cfg).unwrap();
+        fs::write(&config_path, &toml_str).expect("Couldn't write default config");
+        default_cfg
+    }
 }
 
 impl Node {
@@ -211,7 +225,7 @@ impl Node {
         resolve_endpoint(state, request_object)
     }
 
-    pub fn run(&mut self, default: bool, rx: Arc<Mutex<Receiver<()>>>, selected_port: u16) {
+    pub fn run(&mut self, default: bool, selected_port: u16) {
         let port: u16 = if default {
             Self::DEFAULT_PORT
         } else {
@@ -224,9 +238,9 @@ impl Node {
             }
         };
 
-        let listener = TcpListener::bind(format!("127.0.0.1:{port}")).unwrap();
+        let tcp_listener = TcpListener::bind(format!("127.0.0.1:{port}")).unwrap();
 
-        listener
+        tcp_listener
             .set_nonblocking(true)
             .expect("Cannot set non-blocking");
 
@@ -235,16 +249,28 @@ impl Node {
             Err(e) => panic!("{e}"),
         };
 
+        // The termination signal will be a socket now
+        let parent = self.config.socket_path.parent().unwrap();
+        std::fs::create_dir_all(parent).expect("Could not create temp dirs for parent socket");
+
+        let mut read_buffer: [u8; 100] = [0u8; 100];
         loop {
-            // Check for termination signal
-            if let Ok(lock) = rx.try_lock() {
-                if lock.try_recv().is_ok() {
-                    break;
+            if let Ok(mut listener) = UnixStream::connect(KILL_SERVER_SOCKET_PATH) {
+                let command: Option<&str> = match listener.read(&mut read_buffer) {
+                    Ok(n) => str::from_utf8(&read_buffer[..n]).ok(),
+                    Err(_) => None,
+                };
+
+                match command {
+                    Some("kill") => break,
+                    Some(&_) => {}
+                    None => {}
                 }
-            };
+            }
+            // Check for local signal
 
             // Try accepting a connection
-            match listener.accept() {
+            match tcp_listener.accept() {
                 Ok((stream, _)) => {
                     let logger = Arc::clone(&self.logger);
                     let state = Arc::clone(&self.state);

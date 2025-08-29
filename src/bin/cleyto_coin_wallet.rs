@@ -9,11 +9,11 @@ enum Args {
     /// Generate a new keypair
     Generate {
         /// Where to store the generated private key
-        #[structopt(long, parse(from_os_str), default_value = "private.pem")]
+        #[structopt(long, parse(from_os_str), default_value = "./private.pem")]
         private_key_file: PathBuf,
 
         /// Where to store the generated public key
-        #[structopt(long, parse(from_os_str), default_value = "public.pem")]
+        #[structopt(long, parse(from_os_str), default_value = "./public.pem")]
         public_key_file: PathBuf,
 
         #[structopt(long, short)]
@@ -23,11 +23,7 @@ enum Args {
     /// Send a transaction
     Send {
         /// Recipient’s public key as a string
-        #[structopt(
-            long = "recipient-key",
-            short = "r",
-            required_unless = "recipient-key-file"
-        )]
+        #[structopt(long = "recipient-key", required_unless = "recipient-key-file")]
         recipient_key: Option<String>,
 
         /// Recipient’s public key from a file
@@ -39,7 +35,7 @@ enum Args {
         recipient_key_file: Option<PathBuf>,
 
         /// Sender’s private key as a string
-        #[structopt(long = "sender-key", short = "s", required_unless = "sender-key-file")]
+        #[structopt(long = "sender-key", short = "sk", required_unless = "sender-key-file")]
         sender_key: Option<String>,
 
         /// Sender’s private key from a file
@@ -55,7 +51,7 @@ enum Args {
         password: Option<String>,
 
         /// Transaction amount
-        #[structopt(long, short = "a")]
+        #[structopt(long, short)]
         amount: i64,
     },
 }

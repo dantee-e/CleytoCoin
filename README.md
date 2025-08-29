@@ -11,14 +11,14 @@
 - [Testing](#testing)
 - [Contributing](#contributing)
 
-# CleytoCoin is still under development, so many of the features listed underneath aren't yet functional
+# CleytoCoin is still under development, so some of the features listed underneath aren't yet functional. Those are marked with [Under development]
 
 We appreciate the interest and are working towards making CleytoCoin a functional and reliable cryptocurrency, but currently it's still in it's early development stages.
 Feel free to give suggestions in the meantime of what you'd like to see implemented in our project!
 
 ## About
 
-**CleytoCoin** is a cryptocurrency built using the Rust programming language. This project aims to create a secure, fast, and decentralized cryptocurrency to facilitate peer-to-peer transactions.
+**CleytoCoin** is a cryptocurrency built using the Rust programming language. This project aims to create a decentralized cryptocurrency to facilitate peer-to-peer transactions.
 
 ## Features
 
@@ -56,37 +56,80 @@ cargo build --release
 
 This will compile the project and generate an optimized binary in the `target/release` directory.
 
-## Usage
+## Node Usage
 
 ### Starting the node
 
 To start the cryptocurrency node, use the following command:
 
 ```bash
-cargo run --bin node
+cargo run --bin node start
+```
+
+With the option of running the GUI:
+
+```bash
+cargo run --bin node start --gui
 ```
 
 The node will start and connect to the network. For now, only full nodes are available and they don't have yet the capacity for mining
 
-### Creating a wallet
+### Killing the node
 
-To generate a new wallet, run the following:
+To kill the node, we follow the same pattern as before:
 
 ```bash
-cargo run --bin cleyto-coin-wallet generate
+cargo run --bin node kill
 ```
 
-This will generate a private key and address for your wallet.
+## Wallet Usage
+
+The `cleyto-coin-wallet` CLI has two main commands: `generate` (to create a wallet) and `send` (to send transactions).
+
+### Generating a wallet
+Generates a new keypair (private and public keys) for your wallet.
+
+```bash
+cargo run --bin cleyto-coin-wallet generate \
+    --private-key-file <private-key-file> \
+    --public-key-file <public-key-file> \
+    [-p <password>]
+vbnet
+```
+---
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--private-key-file` | Path where the generated private key will be stored | `./private.pem` |
+| `--public-key-file`  | Path where the generated public key will be stored  | `./public.pem` |
+| `-p, --password`     | Optional password to encrypt your private key | none |
+
+
+
 
 ### Sending a transaction
 
-To send a transaction, use the following command:
+To send a transaction, you can use the same binary, but with the `send` subcommand
 
 ```bash
-cargo run --bin cleyto-coin-wallet send --to <recipient_address> --amount <amount> --private-key <your_private_key>
+cargo run --bin cleyto-coin-wallet send \
+    --recipient-key <recipient_public_key> \
+    --sender-key <your_private_key> \
+    --amount <amount> \
+    [-p <password>]
+```
+Or, using key files:
+```bash
+cargo run --bin cleyto-coin-wallet send \
+    --recipient-key-file <recipient_key_file> \
+    --sender-key-file <your_private_key_file> \
+    --amount <amount> \
+    [-p <password>]
 ```
 
-### Mining (not yet implemented)
+### Mining [Under develpment]
 
 Start mining by running:
 

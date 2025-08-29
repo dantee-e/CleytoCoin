@@ -1,12 +1,8 @@
 use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
 use cleyto_coin::chain::wallet::Wallet;
-use cleyto_coin::node;
-use std::{
-    sync::{mpsc, Arc, Mutex},
-    thread,
-};
+use cleyto_coin::{kill_server, run_server_thread};
+use std::thread;
 
-use cleyto_coin::chain::Chain;
 use reqwest::blocking::Client;
 
 fn thread_post(n: u16) {
@@ -95,25 +91,15 @@ fn thread_get(n: u16) {
 
 #[test]
 fn main() {
-    let (tx, rx) = mpsc::channel::<()>();
-
     // Channel to kill thread
-    let rx = Arc::new(Mutex::new(rx));
 
     // Run server thread
-    let server = thread::spawn(move || {
-        let rx = Arc::clone(&rx);
-        let (mut node, _) = node::Node::new(Chain::new());
-        node.run(true, rx, 0);
-    });
+    run_server_thread();
 
     // 10.000 breaks the os (client), but the server seems fine
     // Error accepting connection: Too many open files (os error 24)
     thread_get(10);
     thread_post(10);
 
-    tx.send(()).expect("Failed to send termination signal.");
-
-    // Wait for the server thread to finish (this will block until the server thread terminates)
-    server.join().expect("Server thread panicked.");
+    kill_server();
 }

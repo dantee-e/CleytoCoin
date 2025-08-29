@@ -8,11 +8,15 @@ use crate::{
 };
 use openssl::pkey::{PKey, Private, Public};
 use reqwest::Client;
-use std::path::PathBuf;
 use std::{
-    sync::{mpsc, mpsc::Sender, Arc, Mutex},
-    thread,
+    io::Write,
+    os::unix::net::UnixListener,
+    path::PathBuf,
+    process::{Command, Stdio},
 };
+use std::{sync::Arc, thread};
+mod configs;
+use configs::KILL_SERVER_SOCKET_PATH;
 
 pub mod chain;
 pub mod node;
@@ -129,18 +133,16 @@ pub async fn send(
 }
 
 pub fn run_server_with_gui() -> color_eyre::Result<()> {
-    let (tx, rx) = mpsc::channel::<()>();
-
     // Channel to kill thread
-    let rx = Arc::new(Mutex::new(rx));
+    // let rx = Arc::new(Mutex::new(rx));
 
     let (mut node, logger) = node::Node::new(Chain::new());
 
     // Run server thread
     let server = thread::spawn(move || {
-        let rx = Arc::clone(&rx);
+        // let rx = Arc::clone(&rx);
 
-        node.run(true, rx, 0);
+        node.run(true, 0);
     });
 
     color_eyre::install()?;
@@ -149,24 +151,45 @@ pub fn run_server_with_gui() -> color_eyre::Result<()> {
     ratatui::restore();
 
     // Quits server
-    tx.send(())?;
+    kill_server();
 
     server.join().unwrap();
     result
 }
 
 /// Spawns thread with server and return the channel that sends the kill signal
-pub fn run_server() -> Sender<()> {
-    let (tx, rx) = mpsc::channel::<()>();
-    let rx = Arc::new(Mutex::new(rx));
+/// Mostly useful for testing
+pub fn run_server_thread() {
     let (mut node, _) = node::Node::new(Chain::new());
     thread::spawn(move || {
-        node.run(true, rx, 0);
+        node.run(true, 0);
     });
-    tx
+}
+
+pub fn run_server() {
+    let (mut node, _) = node::Node::new(Chain::new());
+    node.run(true, 0);
+}
+pub fn run_server_new_process() {
+    #[allow(clippy::zombie_processes)]
+    let child = Command::new(std::env::current_exe().unwrap())
+        .arg("start")
+        .arg("--blocking")
+        .stdout(Stdio::null())
+        .stdin(Stdio::null())
+        .spawn()
+        .expect("Failed to start server process");
+    println!("Spawned process with pid {}", child.id());
 }
 
 /// Sends the kill signal to the server
-pub fn kill_server(tx: Sender<()>) {
-    while tx.send(()).is_ok() {}
+pub fn kill_server() {
+    if std::path::Path::new(KILL_SERVER_SOCKET_PATH).exists() {
+        std::fs::remove_file(KILL_SERVER_SOCKET_PATH).unwrap();
+    }
+    let listener = UnixListener::bind(KILL_SERVER_SOCKET_PATH).expect("Could not bind socket");
+    let (mut stream, _) = listener.accept().expect("No one connected to the listener");
+    stream
+        .write_all("kill".as_bytes())
+        .expect("Error writing kill signal");
 }
