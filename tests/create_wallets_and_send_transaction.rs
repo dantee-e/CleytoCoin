@@ -43,7 +43,8 @@ async fn test_send_transaction() {
         sender_password,
         100,
     )
-    .await;
+    .await
+    .unwrap();
 
     kill_server();
 }

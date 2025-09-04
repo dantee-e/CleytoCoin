@@ -5,11 +5,10 @@ use super::helpers::{
     HTTPResult, Handler, POSTFunc,
 };
 use super::methods::{Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData};
-use crate::chain::transaction::{
-    Transaction, TransactionDeserializeError, TransactionValidationError,
-};
+use crate::chain::transaction::{Transaction, TransactionDeserializeError, TransactionError};
 use crate::node::NodeState;
 use chrono::Utc;
+use core::panic;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -44,19 +43,21 @@ pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTP
         Ok(()) => {}
         Err(e) => {
             return match e {
-                TransactionValidationError::OpenSSLError(_) => {
-                    Err(HTTPResponseError::InternalServerError(Some(
-                        "Error in the OpenSSL library when verifying a transaction".to_string(),
-                    )))
-                }
-                TransactionValidationError::ValidationError => {
-                    Err(HTTPResponseError::BadRequest(Some(
-                        "Transaction submitted with \
+                TransactionError::OpenSSLError(_) => Err(HTTPResponseError::InternalServerError(
+                    Some("Error in the OpenSSL library when verifying a transaction".to_string()),
+                )),
+                TransactionError::ValidationError => Err(HTTPResponseError::BadRequest(Some(
+                    "Transaction submitted with \
                     invalid signature"
-                            .to_string(),
-                    )))
-                }
-            }
+                        .to_string(),
+                ))),
+                TransactionError::InsufficientInputs => Err(HTTPResponseError::BadRequest(Some(
+                    "Transaction's outputs are bigger that its inputs".to_string(),
+                ))),
+                // TODO Should move both of those to another error enum, maybe client and server errors
+                TransactionError::InsufficientFunds => panic!("Not the server's problem"),
+                TransactionError::ConnectionError(_) => panic!("Not the server's problem"),
+            };
         }
     };
 
@@ -79,7 +80,7 @@ pub fn favicon(_: &GETData, _: Arc<Mutex<NodeState>>) -> HTTPResult {
 }
 
 pub fn status(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
-    let mut state = match state.lock() {
+    let state = match state.lock() {
         Ok(guard) => guard,
         Err(_) => panic!("Mutex lock was poisoned in function status on endpoints"),
     };

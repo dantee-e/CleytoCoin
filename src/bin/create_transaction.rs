@@ -1,10 +1,13 @@
 use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
+use cleyto_coin::chain::utxo::UTXO;
 use cleyto_coin::chain::wallet::Wallet;
 use reqwest::Client;
 use std::error::Error;
 
 #[tokio::main]
 async fn main() {
+    todo!("The post_json function is not operational right now, because it only creates a random transacion without any arguments");
+    #[allow(unreachable_code)]
     post_json().await.expect("TODO: panic message");
 }
 
@@ -30,7 +33,16 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
 
     let (wallet_sender, walletpk_sender) = Wallet::new();
     let (wallet_receiver, _) = Wallet::new();
-    let transactioninfo: TransactionInfo = TransactionInfo::new(12345);
+
+    let input_utxos = vec![
+        UTXO::new(1000, wallet_sender.clone()),
+        UTXO::new(2000, wallet_sender.clone()),
+    ];
+    let output_utxos = vec![
+        UTXO::new(2500, wallet_receiver.clone()),
+        UTXO::new(500, wallet_sender.clone()),
+    ];
+    let transactioninfo: TransactionInfo = TransactionInfo::new(input_utxos, output_utxos);
 
     let signature = match walletpk_sender.sign_transaction(&transactioninfo) {
         Ok(signed_hashed_message) => signed_hashed_message,

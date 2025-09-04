@@ -1,8 +1,9 @@
 use chrono::prelude::Utc;
+use serde::{self, Deserialize, Serialize};
 use std::io::{self};
 use std::sync::{Mutex, PoisonError};
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Logger {
     logs: Mutex<Vec<String>>,
     temp_logs: Mutex<Vec<String>>,

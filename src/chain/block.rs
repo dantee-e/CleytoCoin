@@ -163,4 +163,29 @@ impl Block {
 
         self
     }
+
+    pub fn test_block(chain: &Chain) -> Self {
+        let previous_hash = chain.get_last_hash();
+        let index = chain.get_last_index() + 1;
+        let timestamp = Utc::now();
+
+        let transactions = vec![
+            Transaction::default(),
+            Transaction::default(),
+            Transaction::default(),
+        ];
+
+        let mut block = Self {
+            previous_hash,
+            transactions,
+            index,
+            timestamp,
+            hash: String::new(),
+            nonce: 0, // temporary so that we can calculate hash
+        };
+
+        block.hash = block.calculate_hash();
+
+        block
+    }
 }

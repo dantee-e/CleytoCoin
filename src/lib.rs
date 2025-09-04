@@ -1,13 +1,14 @@
 use crate::{
     chain::{
-        transaction::{self, Transaction, TransactionInfo},
+        transaction::{self, Transaction, TransactionError, TransactionInfo},
+        utxo::UTXO,
         wallet::{Wallet, WalletPK},
         Chain,
     },
     node::ui::App,
 };
 use openssl::pkey::{PKey, Private, Public};
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use std::{
     io::Write,
     os::unix::net::UnixListener,
@@ -21,7 +22,7 @@ use configs::KILL_SERVER_SOCKET_PATH;
 pub mod chain;
 pub mod node;
 
-async fn send_transaction(transaction: transaction::Transaction) {
+async fn send_transaction(transaction: transaction::Transaction) -> Result<(), TransactionError> {
     let client = Client::new();
 
     let transaction_json = transaction.serialize();
@@ -38,10 +39,13 @@ async fn send_transaction(transaction: transaction::Transaction) {
     // Check the response status
     let status = response.status();
     let response_body = response.text().await.unwrap();
+    match status {
+        StatusCode::OK => Ok(()),
 
-    // Print the response
-    println!("Response Status: {}", status);
-    println!("Response Body: {}", response_body);
+        _ => Err(TransactionError::ConnectionError(format!(
+            "Error: {status}\n{response_body}"
+        ))),
+    }
 }
 
 fn read_key_string_or_file(string: &Option<String>, file: &Option<PathBuf>) -> String {
@@ -91,8 +95,8 @@ pub async fn send(
     sender_key: Option<String>,
     sender_key_file: Option<PathBuf>,
     password: Option<String>,
-    amount: i64,
-) {
+    amount: u64,
+) -> Result<(), TransactionError> {
     let recipient_key_str = read_key_string_or_file(&recipient_key, &recipient_key_file);
     let sender_key_str = read_key_string_or_file(&sender_key, &sender_key_file);
 
@@ -112,8 +116,20 @@ pub async fn send(
     let sender_wallet = WalletPK::from(sender_pkey);
     let recipient_wallet = Wallet::from(recipient_pkey);
 
+    // find input utxos
+    let input_utxos = match sender_wallet.public_wallet().get_utxos(amount) {
+        Ok(vec) => vec,
+        Err(_) => return Err(TransactionError::InsufficientFunds),
+    };
+
+    // Create output UTXOs
+    let input_sum = UTXO::sum(&input_utxos);
+    let rec_utxo = UTXO::new(amount, recipient_wallet.clone());
+    let change_utxo = UTXO::new(input_sum - amount, sender_wallet.public_wallet());
+    let output_utxos = vec![change_utxo, rec_utxo];
+
     // create transaction info
-    let transaction_info = TransactionInfo::new(amount);
+    let transaction_info = TransactionInfo::new(input_utxos, output_utxos);
 
     // sign the transaction
     let signature = sender_wallet
@@ -129,7 +145,7 @@ pub async fn send(
     .inspect_err(|e| eprintln!("Failed creating the transaction: {e}"))
     .unwrap();
 
-    send_transaction(transaction).await;
+    send_transaction(transaction).await
 }
 
 pub fn run_server_with_gui() -> color_eyre::Result<()> {

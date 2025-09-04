@@ -1,6 +1,8 @@
 pub mod block;
+mod ordered_vector;
 pub mod transaction;
 pub mod utils;
+pub mod utxo;
 pub mod wallet;
 use block::Block;
 use serde::{Deserialize, Serialize};
@@ -12,7 +14,9 @@ pub struct Chain {
 
 impl Chain {
     pub fn new() -> Self {
-        Self { blocks: Vec::new() }
+        let mut chain = Self { blocks: Vec::new() };
+        chain.create_genesis_block();
+        chain
     }
 
     pub fn add_block(&mut self, block: Block) {
@@ -25,23 +29,17 @@ impl Chain {
         genesis
     }
 
-    pub fn get_last_hash(&mut self) -> String {
-        match self.blocks.last() {
-            Some(block) => block.get_hash(),
-            None => {
-                let genesis_block = self.create_genesis_block();
-                genesis_block.get_hash()
-            }
-        }
+    pub fn get_last_hash(&self) -> String {
+        self.blocks
+            .last()
+            .expect("Chain was created without genesis_block")
+            .get_hash()
     }
 
-    pub fn get_last_index(&mut self) -> u64 {
-        match self.blocks.last() {
-            Some(block) => block.get_index(),
-            None => {
-                let genesis_block = self.create_genesis_block();
-                genesis_block.get_index()
-            }
-        }
+    pub fn get_last_index(&self) -> u64 {
+        self.blocks
+            .last()
+            .expect("Chain was created without genesis_block")
+            .get_index()
     }
 }

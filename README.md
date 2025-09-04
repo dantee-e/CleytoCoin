@@ -20,17 +20,9 @@ Feel free to give suggestions in the meantime of what you'd like to see implemen
 
 **CleytoCoin** is a cryptocurrency built using the Rust programming language. This project aims to create a decentralized cryptocurrency to facilitate peer-to-peer transactions.
 
-## Features
-
-- **Proof of Work (PoW)** consensus mechanism
-- Secure peer-to-peer transactions
-- Fast block generation time
-- High scalability and low latency
-- Rust-based with a focus on performance and safety
-
 ## Getting Started
 
-Follow these instructions to get your local instance of **CleytoCoin** up and running.
+Follow these instructions to get your local instance of a **CleytoCoin** node up and running.
 
 ### Prerequisites
 
@@ -56,6 +48,10 @@ cargo build --release
 
 This will compile the project and generate an optimized binary in the `target/release` directory.
 
+# How to use the binaries
+
+Thanks to the [StructOpt](https://crates.io/crates/structopt) crate, whenever you feel in doubt about one of the features of **CleytoCoin**, you can use the flag --help of the CLI tool to see flags and arguments for said feature.
+
 ## Node Usage
 
 ### Starting the node
@@ -71,6 +67,9 @@ With the option of running the GUI:
 ```bash
 cargo run --bin node start --gui
 ```
+
+The server with the GUI will block the terminal, while just running the start creates a new process, which has to be killed afterwards using the [kill command](#killing-the-node)
+
 
 The node will start and connect to the network. For now, only full nodes are available and they don't have yet the capacity for mining
 

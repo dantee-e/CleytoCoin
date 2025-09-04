@@ -52,7 +52,7 @@ enum Args {
 
         /// Transaction amount
         #[structopt(long, short)]
-        amount: i64,
+        amount: u64,
     },
 }
 
@@ -73,7 +73,7 @@ async fn main() {
             password,
             amount,
         } => {
-            send(
+            match send(
                 recipient_key,
                 recipient_key_file,
                 sender_key,
@@ -82,6 +82,10 @@ async fn main() {
                 amount,
             )
             .await
+            {
+                Ok(_) => {}
+                Err(e) => println!("Error {e} when sending transaction to server"),
+            }
         }
     }
 }

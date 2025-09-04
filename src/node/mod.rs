@@ -50,9 +50,13 @@ impl Default for NodeConfig {
 #[derive(Serialize, Deserialize)]
 pub struct Node {
     state: Arc<Mutex<NodeState>>,
-    #[serde(skip)] // The logs are manually saved on shutdown and reloaded on initialization
+
+    // The logs are manually saved on shutdown and reloaded on initialization
+    #[serde(skip)]
     logger: Arc<logger::Logger>,
-    #[serde(skip)] // The configs are best reloaded with every initialization
+
+    // The configs are best reloaded with every initialization
+    #[serde(skip)]
     config: NodeConfig,
 }
 
@@ -221,7 +225,6 @@ impl Node {
 
         request_object.set_stream(stream);
 
-        // TODO add logging
         resolve_endpoint(state, request_object)
     }
 

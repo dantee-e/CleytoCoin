@@ -1,0 +1,1 @@
+write tests for the new get_utxos function, check if it panics or if something bad happens
