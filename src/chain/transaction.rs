@@ -134,6 +134,7 @@ pub struct Transaction {
     pub txid: [u8; 32],
 }
 
+// TODO eventually, I want to make the transactions not need to have the sender adress
 impl Transaction {
     pub fn new(
         sender: Wallet,

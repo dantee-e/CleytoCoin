@@ -182,11 +182,21 @@ impl Wallet {
         self.public_key.public_key_to_pem().unwrap()
     }
 
-    fn estimate_fee_per_utxo() -> u64 {
+    fn estimate_fee_per_utxo(_utxo: &UTXO) -> u64 {
         0
     }
 
-    // TODO write some tests for this bad boy
+    pub fn add_utxos(&mut self, new_vec: Vec<UTXO>) {
+        match self.available_utxos {
+            Some(ref mut ord_vec) => {
+                for utxo in new_vec {
+                    ord_vec.insert(utxo);
+                }
+            }
+            None => self.available_utxos = Some(OrderedVec::from(new_vec)),
+        }
+    }
+
     pub fn get_utxos(&self, amount: u64) -> Result<Vec<UTXO>, WalletError> {
         let available_utxos = self.available_utxos.clone().expect("Found no UTXOs");
         if UTXO::sum(&available_utxos) < amount {
@@ -200,17 +210,20 @@ impl Wallet {
             .clone()
             .into_iter()
             .enumerate()
-            .find(|(_, utxo)| utxo.value() > amount)
+            .find(|(_, utxo)| utxo.value() >= amount)
         {
-            Some((index, value)) => {
-                solutions.push(vec![value]);
+            Some((index, utxo)) => {
+                if utxo.value() == amount {
+                    return Ok(vec![utxo]);
+                }
+                solutions.push(vec![utxo]);
                 index
             }
             None => available_utxos.len(),
         };
 
         // https://bitcoin.stackexchange.com/questions/1077/what-is-the-coin-selection-algorithm
-        // if the sum of all yout UTXO smaller than the target happens to match the target,they
+        // if the sum of all your UTXO smaller than the target happens to match the target,they
         // will be used
 
         fn calculate_recursion_depth(
@@ -228,27 +241,23 @@ impl Wallet {
 
         fn recursive(
             slice: &[UTXO],
+            k: usize,
             solutions: &mut Vec<Vec<UTXO>>,
             target: u64,
             x: &mut Option<u32>,
         ) {
-            if slice.is_empty() {
-                return;
-            }
-            if let Some(ref mut depth) = x {
-                if *depth == 0 {
+            if let Some(x) = x {
+                if *x == 0 {
                     return;
                 }
-                *depth -= 1;
             }
             let mut sum = 0;
-            let k = slice.len() / 2;
             let mut elements: Vec<UTXO> = vec![slice[k].clone()];
             sum += slice[k].value();
 
             for i in 0..k {
                 sum += slice[k - i].value();
-                elements.push(slice[k - i].clone());
+                elements.push(slice[k - 1].clone());
                 if sum > target {
                     // if there's no x yet, we calculate it here. The x is a function of the number
                     // of elements necessary in the first iteration. If many elements are needed in the
@@ -266,8 +275,30 @@ impl Wallet {
                     break;
                 }
             }
-            recursive(&slice[0..k], solutions, target, x);
-            recursive(&slice[k..], solutions, target, x);
+            recursive(slice, k / 2, solutions, target, x);
+            recursive(slice, k * 3 / 2, solutions, target, x);
+        }
+
+        // TODO finish this shit
+        fn branch_and_bound_entrypoint(
+            slice: &[UTXO], // must be ordered from biggest to smallest
+            k: usize,
+            solutions: &mut Vec<Vec<UTXO>>,
+            target: u64,
+            x: &mut Option<u32>,
+        ) {
+            struct UTXOEstimate {
+                utxo: UTXO,
+                estimated_value: u64,
+            }
+            fn waste(transaction_info: &TransactionInfo) {}
+            let new_slice: Vec<UTXOEstimate> = slice
+                .iter()
+                .map(|utxo| UTXOEstimate {
+                    utxo: utxo.clone(),
+                    estimated_value: Wallet::estimate_fee_per_utxo(utxo),
+                })
+                .collect();
         }
 
         let dust_threshold = Self::estimate_fee_per_utxo() * 3;
@@ -294,8 +325,10 @@ impl Wallet {
             // and again with the element in the middle of s[0..k]. This creates kind of a binary search through the vector.
             //
             // We repeat the process recursively x times, x being arbitrarily defined
+            let first_k = utxos_smaller_than_target.len() / 2;
             recursive(
                 &utxos_smaller_than_target,
+                first_k,
                 &mut solutions,
                 target,
                 &mut None,

@@ -1,5 +1,5 @@
 pub mod block;
-mod ordered_vector;
+pub mod ordered_vector;
 pub mod transaction;
 pub mod utils;
 pub mod utxo;
