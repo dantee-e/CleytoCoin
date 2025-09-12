@@ -4,6 +4,7 @@ pub mod transaction;
 pub mod utils;
 pub mod utxo;
 pub mod wallet;
+mod wallet_pk;
 use block::Block;
 use serde::{Deserialize, Serialize};
 

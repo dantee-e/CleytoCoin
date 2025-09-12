@@ -4,11 +4,11 @@ use crate::chain::utxo::UTXO;
 use super::transaction::TransactionInfo;
 use openssl::error::ErrorStack;
 
+pub use super::wallet_pk::WalletPK;
 use openssl::hash::MessageDigest;
-use openssl::pkey::{PKey, Private, Public};
+use openssl::pkey::{PKey, Public};
 use openssl::rsa::Rsa;
-use openssl::sign::{Signer, Verifier};
-use openssl::symm::Cipher;
+use openssl::sign::Verifier;
 use serde::de::{self, Error};
 use serde::{Deserialize, Serialize};
 
@@ -25,68 +25,7 @@ impl std::fmt::Display for WalletError {
 impl std::error::Error for WalletError {}
 // -----------------------------------------------------------------------------------------------------------------
 
-// ---------------------------------------------- WalletPK definition ----------------------------------------------
-#[derive(Debug)]
-pub struct WalletPK {
-    private_key: PKey<Private>,
-}
-
-impl WalletPK {
-    pub fn sign_transaction(
-        &self,
-        transaction_info: &TransactionInfo,
-    ) -> Result<Vec<u8>, ErrorStack> {
-        let mut signer = Signer::new(MessageDigest::sha256(), &self.private_key)?;
-        signer.sign_oneshot_to_vec(transaction_info.to_string().as_bytes())
-    }
-    pub fn to_pem_with_password(&self, password: &String) -> Vec<u8> {
-        self.private_key
-            .private_key_to_pem_pkcs8_passphrase(Cipher::aes_256_cbc(), password.as_bytes())
-            .unwrap()
-    }
-    pub fn to_pem(&self) -> Vec<u8> {
-        self.private_key.private_key_to_pem_pkcs8().unwrap()
-    }
-    pub fn public_wallet(&self) -> Wallet {
-        let public_key = PKey::public_key_from_pem(
-            &self
-                .private_key
-                .public_key_to_pem()
-                .expect("Could not extract Publick Key from Private Key"),
-        )
-        .unwrap();
-
-        Wallet {
-            public_key,
-            available_utxos: None,
-        }
-    }
-}
-impl From<PKey<Private>> for WalletPK {
-    fn from(private_key: PKey<Private>) -> Self {
-        Self { private_key }
-    }
-}
-
-// -----------------------------------------------------------------------------------------------------------------
-
-// ---------------------------------------------- Wallet definition ------------------------------------------------
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Wallet {
-    #[serde(
-        serialize_with = "serialize_public_key",
-        deserialize_with = "deserialize_public_key"
-    )]
-    public_key: PKey<Public>, // Should I store this as PEM or as PKey<Public>?
-    available_utxos: Option<OrderedVec<UTXO>>,
-}
-
-impl PartialEq for Wallet {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_pem() == other.to_pem()
-    }
-}
-
+// ------------------------------------------------- Serde stuff ---------------------------------------------------
 fn serialize_public_key<S>(key: &PKey<Public>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -124,6 +63,14 @@ where
     // use our visitor to deserialize an `ActualValue`
     deserializer.deserialize_any(StringVisitor)
 }
+// -----------------------------------------------------------------------------------------------------------------
+
+// ------------------------------------------------- Traits stuff --------------------------------------------------
+impl PartialEq for Wallet {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_pem() == other.to_pem()
+    }
+}
 
 impl From<String> for Wallet {
     fn from(value: String) -> Self {
@@ -145,19 +92,41 @@ impl From<PKey<Public>> for Wallet {
         }
     }
 }
-const MAX_UTXO_SEARCH_DEPTH: usize = 100;
-impl Wallet {
-    pub fn new() -> (Self, WalletPK) {
-        let bits: u32 = 2048;
-        let rsa = Rsa::generate(bits).unwrap();
-        let private_key = PKey::from_rsa(rsa).unwrap();
+// -----------------------------------------------------------------------------------------------------------------
 
+// ---------------------------------------------- Wallet definition ------------------------------------------------
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Wallet {
+    #[serde(
+        serialize_with = "serialize_public_key",
+        deserialize_with = "deserialize_public_key"
+    )]
+    pub(crate) public_key: PKey<Public>,
+    pub(crate) available_utxos: Option<OrderedVec<UTXO>>,
+}
+
+const MAX_UTXO_SEARCH_DEPTH: usize = 100;
+const UTXO_WEIGHT: u64 = 64; // typical weight of a P2PKH output - replace with real weight
+const LONG_TERM_FEE_RATE: u64 = 1; // placeholder - replace with real rate
+
+impl Wallet {
+    /* --------------------------------------------------------------------- *
+     *                         Construction & Utilities                     *
+     * --------------------------------------------------------------------- */
+
+    /// Creates a fresh key pair and returns `(wallet, private_key_wrapper)`.
+    pub fn new() -> (Self, WalletPK) {
+        // 2048‑bit RSA key – adjust size if you need stronger security.
+        let rsa = Rsa::generate(2048).expect("RSA generation failed");
+        let private_key = PKey::from_rsa(rsa).expect("Invalid RSA key");
+
+        // Export the public part as PEM and immediately parse it back.
         let public_key = PKey::public_key_from_pem(
             &private_key
                 .public_key_to_pem()
-                .expect("Could not extract Publick Key from Private Key"),
+                .expect("Could not extract public key from private key"),
         )
-        .unwrap();
+        .expect("Failed to parse PEM public key");
 
         (
             Wallet {
@@ -168,6 +137,7 @@ impl Wallet {
         )
     }
 
+    /// Verify a signed `TransactionInfo` using the stored public key.
     pub fn verify_transaction_info(
         &self,
         transaction_info: &TransactionInfo,
@@ -178,17 +148,22 @@ impl Wallet {
         verifier.verify(signature)
     }
 
+    /// Export the public key as PEM bytes.
     pub fn to_pem(&self) -> Vec<u8> {
-        self.public_key.public_key_to_pem().unwrap()
+        self.public_key
+            .public_key_to_pem()
+            .expect("PEM conversion failed")
     }
 
+    /// Rough fee estimate per UTXO – replace with a real estimator later.
     fn estimate_fee_per_utxo(_utxo: &UTXO) -> u64 {
-        0
+        100
     }
 
+    /// Insert a batch of new UTXOs, keeping the internal ordering intact.
     pub fn add_utxos(&mut self, new_vec: Vec<UTXO>) {
-        match self.available_utxos {
-            Some(ref mut ord_vec) => {
+        match &mut self.available_utxos {
+            Some(ord_vec) => {
                 for utxo in new_vec {
                     ord_vec.insert(utxo);
                 }
@@ -197,161 +172,274 @@ impl Wallet {
         }
     }
 
+    /* --------------------------------------------------------------------- *
+     *                         Coin‑Selection Logic                         *
+     * --------------------------------------------------------------------- */
+    /// Public entry point – selects a set of UTXOs whose summed value covers
+    /// `amount`. Returns an error if the wallet does not contain enough funds.
     pub fn get_utxos(&self, amount: u64) -> Result<Vec<UTXO>, WalletError> {
-        let available_utxos = self.available_utxos.clone().expect("Found no UTXOs");
-        if UTXO::sum(&available_utxos) < amount {
+        let utxos = self
+            .available_utxos
+            .as_ref()
+            .ok_or(WalletError::InsufficientFunds)?
+            .clone();
+
+        // Quick check – if the total balance is insufficient we can bail early.
+        if UTXO::sum(&utxos) < amount {
             return Err(WalletError::InsufficientFunds);
         }
-        let mut solutions: Vec<Vec<UTXO>> = Vec::new();
 
-        // Gets the first UTXO (if there is such a value) that's is bigger than the requested
-        // amount
-        let index = match available_utxos
+        // 1️⃣  Simple exact‑match shortcut.
+        if let Some(single) = utxos.clone().into_iter().find(|u| u.value() == amount) {
+            return Ok(vec![single.clone()]);
+        }
+
+        for utxo in utxos.clone() {
+            println!("UTXO of value {}", utxo.value());
+        }
+        // 2️⃣  Find the smallest UTXO that already exceeds the target.
+        let first_over_idx = utxos
             .clone()
             .into_iter()
-            .enumerate()
-            .find(|(_, utxo)| utxo.value() >= amount)
-        {
-            Some((index, utxo)) => {
-                if utxo.value() == amount {
-                    return Ok(vec![utxo]);
-                }
-                solutions.push(vec![utxo]);
-                index
-            }
-            None => available_utxos.len(),
-        };
+            .position(|u| u.value() < amount)
+            .unwrap_or(0);
 
-        // https://bitcoin.stackexchange.com/questions/1077/what-is-the-coin-selection-algorithm
-        // if the sum of all your UTXO smaller than the target happens to match the target,they
-        // will be used
+        println!("first_over_idx is {first_over_idx}");
 
-        fn calculate_recursion_depth(
-            max_depth: usize,
-            elements_tested: usize,
-            total_elements: usize,
-        ) -> u32 {
-            if total_elements == 0 {
-                return 0;
-            }
-            let fraction_used = elements_tested as f64 / total_elements as f64;
-            let new_depth = (max_depth as f64 * (1.0 - fraction_used)).ceil() as u32;
-            std::cmp::max(new_depth, 1)
+        // If we found a single “big enough” UTXO, keep it as a candidate solution.
+        let mut candidate_solutions = Vec::new();
+        if let Some(utxo) = utxos.get(first_over_idx - 1) {
+            candidate_solutions.push(vec![utxo.clone()]);
         }
 
-        fn recursive(
-            slice: &[UTXO],
-            k: usize,
-            solutions: &mut Vec<Vec<UTXO>>,
-            target: u64,
-            x: &mut Option<u32>,
-        ) {
-            if let Some(x) = x {
-                if *x == 0 {
-                    return;
-                }
-            }
-            let mut sum = 0;
-            let mut elements: Vec<UTXO> = vec![slice[k].clone()];
-            sum += slice[k].value();
+        // 3️⃣  Branch‑and‑bound selection on the remaining (smaller) UTXOs.
 
-            for i in 0..k {
-                sum += slice[k - i].value();
-                elements.push(slice[k - 1].clone());
-                if sum > target {
-                    // if there's no x yet, we calculate it here. The x is a function of the number
-                    // of elements necessary in the first iteration. If many elements are needed in the
-                    // first iteration, that means that if I continue for too many times there will be a
-                    // lot of overlap. Therefore, we reduce the size of x
-                    if x.is_none() {
-                        *x = Some(calculate_recursion_depth(
-                            MAX_UTXO_SEARCH_DEPTH,
-                            i,
-                            slice.len(),
-                        ));
-                    }
+        let dust_threshold = Self::estimate_fee_per_utxo(&utxos[0]) * 3;
+        let smaller_utxos = &utxos.get_slice(first_over_idx..utxos.len());
+        println!("len of smaller_utxos is {}", smaller_utxos.len());
 
-                    solutions.push(elements);
-                    break;
-                }
-            }
-            recursive(slice, k / 2, solutions, target, x);
-            recursive(slice, k * 3 / 2, solutions, target, x);
+        println!("The amount is {amount} and the dust_threshold is {dust_threshold}");
+        let (bnb_solution, _) = self.branch_and_bound(
+            smaller_utxos,
+            amount,
+            dust_threshold,
+            100_000, // max repetitions
+        );
+        println!("Finished bnb");
+
+        if !bnb_solution.is_empty() {
+            return Ok(bnb_solution);
+        } else {
+            println!("bnb solution is empty");
+            return Err(WalletError::InsufficientFunds);
         }
 
-        // TODO finish this shit
-        fn branch_and_bound_entrypoint(
-            slice: &[UTXO], // must be ordered from biggest to smallest
-            k: usize,
-            solutions: &mut Vec<Vec<UTXO>>,
-            target: u64,
-            x: &mut Option<u32>,
-        ) {
-            struct UTXOEstimate {
-                utxo: UTXO,
-                estimated_value: u64,
-            }
-            fn waste(transaction_info: &TransactionInfo) {}
-            let new_slice: Vec<UTXOEstimate> = slice
-                .iter()
-                .map(|utxo| UTXOEstimate {
-                    utxo: utxo.clone(),
-                    estimated_value: Wallet::estimate_fee_per_utxo(utxo),
-                })
-                .collect();
-        }
-
-        let dust_threshold = Self::estimate_fee_per_utxo() * 3;
+        #[allow(unreachable_code)]
+        // 4️⃣  Pick the “best” solution (the one with the highest sum that still
+        //     satisfies the target). If none exists we fall back to the exact‑match
+        //     error (already handled at the top).
         let target = amount + dust_threshold;
-        let utxos_smaller_than_target = available_utxos.get_slice(0..index).to_vec();
-        let sum: u64 = UTXO::sum(&utxos_smaller_than_target);
+        Self::dantes_crazy_coin_selection_algorithm(
+            smaller_utxos,
+            MAX_UTXO_SEARCH_DEPTH,
+            &mut candidate_solutions,
+            target,
+            -1,
+        );
+        let best = candidate_solutions.into_iter().max_by_key(UTXO::sum);
 
-        if sum == amount {
-            return Ok(available_utxos.get_slice(0..index).to_vec());
+        best.ok_or(WalletError::InsufficientFunds)
+    }
+
+    /// Core branch‑and‑bound algorithm – returns a tuple `(selected_utxos, total_value)`.
+    fn branch_and_bound(
+        &self,
+        slice: &[UTXO],
+        target: u64,
+        dust_threshold: u64,
+        max_reps: usize,
+    ) -> (Vec<UTXO>, u64) {
+        println!("Starting branch_and_bound");
+        // Transform each UTXO into an enriched struct that carries an estimated
+        // “effective value” (value minus fee) and its weight.
+        #[derive(Clone)]
+        struct UtxoEstimate {
+            utxo: UTXO,
+            effective_value: u64,
+            weight: u64,
         }
-        if sum > target {
-            // I'll just use the shit algorithm I invented. Goes like this:
-            // Inputs are target amount and the ordered vector V that contains all available UTXOs
-            // target = target_amount + dust threshold
-            // First, we get the smallest element bigger than the target on the vector with index i
-            // smallest elements vector = s = [0..i]
-            //
-            // We select the middle element of s (index k) and sum it with the following element (k+1).
-            // If it's still smaller than target, sum it with k-1.
-            // If still smaller than target, sum with k+2, and then k-2, k+3, and so on, until we find a solution
-            // and save it as an option in a solutions vector
-            //
-            // We do the same now, but starting the element in the middle of the slice s[k..],
-            // and again with the element in the middle of s[0..k]. This creates kind of a binary search through the vector.
-            //
-            // We repeat the process recursively x times, x being arbitrarily defined
-            let first_k = utxos_smaller_than_target.len() / 2;
-            recursive(
-                &utxos_smaller_than_target,
-                first_k,
-                &mut solutions,
-                target,
-                &mut None,
+
+        let mut total_sum = 0u64;
+        let estimates: Vec<UtxoEstimate> = slice
+            .iter()
+            .map(|u| {
+                total_sum += u.value();
+                UtxoEstimate {
+                    utxo: u.clone(),
+                    effective_value: u.value() - Self::estimate_fee_per_utxo(u),
+                    weight: UTXO_WEIGHT,
+                }
+            })
+            .collect();
+
+        for est in estimates.clone() {
+            println!(
+                "UTXOEstimate (effective_value: {}, weight: {} )",
+                est.utxo.value() - Self::estimate_fee_per_utxo(&est.utxo),
+                UTXO_WEIGHT
             );
         }
 
-        let best_solution = solutions.into_iter().fold(None, |acc, new_vec| match acc {
-            None => Some((UTXO::sum(&new_vec), new_vec)),
-            Some((old_sum, old_vec)) => {
-                let new_sum = UTXO::sum(&new_vec);
-                if new_sum > old_sum {
-                    Some((new_sum, new_vec))
-                } else {
-                    Some((old_sum, old_vec))
-                }
-            }
-        });
-
-        match best_solution {
-            Some((_, vec)) => Ok(vec),
-            // This is probably safe for an unwrap but fuck it
-            None => Err(WalletError::InsufficientFunds),
+        // Helper: compute “waste” (extra fee paid beyond the long‑term rate).
+        fn waste(estimates: &[UtxoEstimate], fee_rate: u64) -> u64 {
+            let total_weight: u64 = estimates.iter().map(|e| e.weight).sum();
+            // println!(
+            //     total_weight * (fee_rate - LONG_TERM_FEE_RATE),
+            //     total_weight,
+            //     fee_rate
+            // );
+            total_weight * (fee_rate - LONG_TERM_FEE_RATE)
         }
+
+        // Recursive branch‑and‑bound search.
+        #[allow(clippy::too_many_arguments)]
+        fn recurse(
+            remaining: &[UtxoEstimate],
+            cur_sum: u64,
+            cur_set: Vec<UtxoEstimate>,
+            sum_left: u64,
+            best_set: &mut Vec<UtxoEstimate>,
+            best_sum: &mut u64,
+            best_waste: &mut u64,
+            target_interval: (u64, u64),
+            fee_rate: u64,
+            reps_left: usize,
+        ) {
+            if reps_left == 0 || remaining.is_empty() {
+                return;
+            }
+
+            // Update the amount left after discarding the current head’s fee.
+            let sum_left = sum_left - remaining[0].effective_value;
+
+            // ---------- Include the head ----------
+            let mut incl_set = cur_set.clone();
+            incl_set.push(remaining[0].clone());
+            let incl_sum = cur_sum + remaining[0].effective_value;
+            let incl_waste = waste(&incl_set, fee_rate);
+
+            if incl_sum >= target_interval.0
+                && incl_sum <= target_interval.1
+                && incl_waste < *best_waste
+            {
+                *best_sum = incl_sum;
+                *best_set = incl_set.clone();
+                *best_waste = incl_waste;
+                // Found a feasible solution – we can stop exploring this branch.
+                return;
+            }
+
+            if incl_sum < target_interval.1
+                && sum_left as i64 > target_interval.0 as i64 - incl_sum as i64
+            {
+                recurse(
+                    &remaining[1..],
+                    incl_sum,
+                    incl_set,
+                    sum_left,
+                    best_set,
+                    best_sum,
+                    best_waste,
+                    target_interval,
+                    fee_rate,
+                    reps_left - 1,
+                );
+            }
+
+            // ---------- Exclude the head ----------
+            if sum_left as i64 > target_interval.0 as i64 - cur_sum as i64 {
+                recurse(
+                    &remaining[1..],
+                    cur_sum,
+                    cur_set,
+                    sum_left,
+                    best_set,
+                    best_sum,
+                    best_waste,
+                    target_interval,
+                    fee_rate,
+                    reps_left - 1,
+                );
+            }
+        }
+
+        // Initialise the search.
+        let mut best_set = Vec::new();
+        let mut best_sum = u64::MAX;
+        let mut best_waste = u64::MAX;
+        recurse(
+            &estimates,
+            0,
+            Vec::new(),
+            total_sum,
+            &mut best_set,
+            &mut best_sum,
+            &mut best_waste,
+            (target, target + dust_threshold),
+            2, // fee_rate placeholder – replace with real rate
+            max_reps,
+        );
+
+        // Strip the auxiliary data and return plain UTXOs.
+        let selected = best_set.into_iter().map(|e| e.utxo).collect::<Vec<_>>();
+        let total_selected = UTXO::sum(&selected);
+        (selected, total_selected)
+    }
+
+    fn calculate_recursion_depth(
+        max_depth: usize,
+        elements_tested: usize,
+        total_elements: usize,
+    ) -> i32 {
+        if total_elements == 0 {
+            return 0;
+        }
+        let fraction_used = elements_tested as f64 / total_elements as f64;
+        let new_depth = (max_depth as f64 * (1.0 - fraction_used)).ceil() as i32;
+        std::cmp::max(new_depth, 1)
+    }
+    fn dantes_crazy_coin_selection_algorithm(
+        slice: &[UTXO],
+        k: usize,
+        solutions: &mut Vec<Vec<UTXO>>,
+        target: u64,
+        mut x: i32, // initialize with -1
+    ) {
+        if x == 0 {
+            return;
+        }
+        let mut sum = 0;
+        let mut elements: Vec<UTXO> = vec![slice[k].clone()];
+        sum += slice[k].value();
+
+        for i in 0..k {
+            sum += slice[k - i].value();
+            elements.push(slice[k - 1].clone());
+            if sum > target {
+                // if there's no x yet, we calculate it here. The x is a function of the number
+                // of elements necessary in the first iteration. If many elements are needed in the
+                // first iteration, that means that if I continue for too many times there will be a
+                // lot of overlap. Therefore, we reduce the size of x
+                if x == -1 {
+                    x = Self::calculate_recursion_depth(MAX_UTXO_SEARCH_DEPTH, i, slice.len());
+                }
+
+                solutions.push(elements);
+                break;
+            }
+        }
+        Self::dantes_crazy_coin_selection_algorithm(slice, k / 2, solutions, target, x - 1);
+        Self::dantes_crazy_coin_selection_algorithm(slice, k * 3 / 2, solutions, target, x - 1);
     }
 }
 

@@ -11,12 +11,14 @@ fn test_get_utxo_wallet() {
         UTXO::new(25000, wallet1.clone()),
         // Medium UTXOs - typical transaction amounts
         UTXO::new(15000, wallet1.clone()),
+        UTXO::new(15000, wallet1.clone()),
         UTXO::new(12000, wallet1.clone()),
-        UTXO::new(10000, wallet1.clone()),
+        UTXO::new(10500, wallet1.clone()),
         UTXO::new(8500, wallet1.clone()),
         UTXO::new(7200, wallet1.clone()),
         UTXO::new(6000, wallet1.clone()),
         UTXO::new(5500, wallet1.clone()),
+        UTXO::new(5000, wallet1.clone()),
         // Small UTXOs - test efficiency vs dust management
         UTXO::new(3000, wallet1.clone()),
         UTXO::new(2500, wallet1.clone()),
