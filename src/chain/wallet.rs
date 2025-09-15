@@ -108,7 +108,15 @@ pub struct Wallet {
 const MAX_UTXO_SEARCH_DEPTH: usize = 100;
 const UTXO_WEIGHT: u64 = 64; // typical weight of a P2PKH output - replace with real weight
 const LONG_TERM_FEE_RATE: u64 = 1; // placeholder - replace with real rate
+const MAX_ITERATIONS_NON_EXACT_COIN_SELECTION: u64 = 10_000;
 
+// Helper for the coin selection algorithms
+#[derive(Clone)]
+struct UtxoEstimate {
+    utxo: UTXO,
+    effective_value: u64,
+    weight: u64,
+}
 impl Wallet {
     /* --------------------------------------------------------------------- *
      *                         Construction & Utilities                     *
@@ -194,9 +202,6 @@ impl Wallet {
             return Ok(vec![single.clone()]);
         }
 
-        for utxo in utxos.clone() {
-            println!("UTXO of value {}", utxo.value());
-        }
         // 2️⃣  Find the smallest UTXO that already exceeds the target.
         let first_over_idx = utxos
             .clone()
@@ -204,73 +209,13 @@ impl Wallet {
             .position(|u| u.value() < amount)
             .unwrap_or(0);
 
-        println!("first_over_idx is {first_over_idx}");
-
-        // If we found a single “big enough” UTXO, keep it as a candidate solution.
-        let mut candidate_solutions = Vec::new();
-        if let Some(utxo) = utxos.get(first_over_idx - 1) {
-            candidate_solutions.push(vec![utxo.clone()]);
-        }
-
         // 3️⃣  Branch‑and‑bound selection on the remaining (smaller) UTXOs.
 
         let dust_threshold = Self::estimate_fee_per_utxo(&utxos[0]) * 3;
         let smaller_utxos = &utxos.get_slice(first_over_idx..utxos.len());
-        println!("len of smaller_utxos is {}", smaller_utxos.len());
 
-        println!("The amount is {amount} and the dust_threshold is {dust_threshold}");
-        let (bnb_solution, _) = self.branch_and_bound(
-            smaller_utxos,
-            amount,
-            dust_threshold,
-            100_000, // max repetitions
-        );
-        println!("Finished bnb");
-
-        if !bnb_solution.is_empty() {
-            return Ok(bnb_solution);
-        } else {
-            println!("bnb solution is empty");
-            return Err(WalletError::InsufficientFunds);
-        }
-
-        #[allow(unreachable_code)]
-        // 4️⃣  Pick the “best” solution (the one with the highest sum that still
-        //     satisfies the target). If none exists we fall back to the exact‑match
-        //     error (already handled at the top).
-        let target = amount + dust_threshold;
-        Self::dantes_crazy_coin_selection_algorithm(
-            smaller_utxos,
-            MAX_UTXO_SEARCH_DEPTH,
-            &mut candidate_solutions,
-            target,
-            -1,
-        );
-        let best = candidate_solutions.into_iter().max_by_key(UTXO::sum);
-
-        best.ok_or(WalletError::InsufficientFunds)
-    }
-
-    /// Core branch‑and‑bound algorithm – returns a tuple `(selected_utxos, total_value)`.
-    fn branch_and_bound(
-        &self,
-        slice: &[UTXO],
-        target: u64,
-        dust_threshold: u64,
-        max_reps: usize,
-    ) -> (Vec<UTXO>, u64) {
-        println!("Starting branch_and_bound");
-        // Transform each UTXO into an enriched struct that carries an estimated
-        // “effective value” (value minus fee) and its weight.
-        #[derive(Clone)]
-        struct UtxoEstimate {
-            utxo: UTXO,
-            effective_value: u64,
-            weight: u64,
-        }
-
-        let mut total_sum = 0u64;
-        let estimates: Vec<UtxoEstimate> = slice
+        let mut total_sum = 0;
+        let estimates: Vec<UtxoEstimate> = smaller_utxos
             .iter()
             .map(|u| {
                 total_sum += u.value();
@@ -281,25 +226,71 @@ impl Wallet {
                 }
             })
             .collect();
+        let (bnb_solution, _) = self.branch_and_bound(
+            &estimates,
+            amount,
+            dust_threshold,
+            100_000, // max repetitions
+            total_sum,
+        );
 
-        for est in estimates.clone() {
-            println!(
-                "UTXOEstimate (effective_value: {}, weight: {} )",
-                est.utxo.value() - Self::estimate_fee_per_utxo(&est.utxo),
-                UTXO_WEIGHT
-            );
+        if !bnb_solution.is_empty() {
+            return Ok(bnb_solution);
+        } else {
+            println!("bnb solution is empty");
         }
 
-        // Helper: compute “waste” (extra fee paid beyond the long‑term rate).
-        fn waste(estimates: &[UtxoEstimate], fee_rate: u64) -> u64 {
-            let total_weight: u64 = estimates.iter().map(|e| e.weight).sum();
-            // println!(
-            //     total_weight * (fee_rate - LONG_TERM_FEE_RATE),
-            //     total_weight,
-            //     fee_rate
-            // );
-            total_weight * (fee_rate - LONG_TERM_FEE_RATE)
+        // 4️⃣  Pick the “best” solution (the one with the lowest waste that still
+        //     satisfies the target). If none exists we fall back to the exact‑match
+        //     error (already handled at the top).
+
+        // If we found a single “big enough” UTXO, keep it as a candidate solution.
+        let mut candidate_solutions = Vec::new();
+        if first_over_idx > 0 {
+            if let Some(utxo) = utxos.get(first_over_idx - 1) {
+                candidate_solutions.push(vec![utxo.clone()]);
+            }
         }
+
+        let target = amount + dust_threshold;
+        let solution = Self::dantes_crazy_algorithm_entrypoint(smaller_utxos, target);
+
+        if solution.is_empty() {
+            return Err(WalletError::InsufficientFunds);
+        }
+        Ok(solution)
+    }
+
+    // Helper: compute “waste” (extra fee paid beyond the long‑term rate).
+    fn waste(estimates: &[UtxoEstimate], fee_rate: u64) -> u64 {
+        let total_weight: u64 = estimates.iter().map(|e| e.weight).sum();
+        // println!(
+        //     "waste is {}, total_weight is {}, fee rate is {}",
+        //     total_weight * (fee_rate - LONG_TERM_FEE_RATE),
+        //     total_weight,
+        //     fee_rate
+        // );
+        total_weight * (fee_rate - LONG_TERM_FEE_RATE)
+    }
+    /// Core branch‑and‑bound algorithm – returns a tuple `(selected_utxos, total_value)`.
+    fn branch_and_bound(
+        &self,
+        estimates: &[UtxoEstimate],
+        target: u64,
+        dust_threshold: u64,
+        max_reps: usize,
+        total_sum: u64,
+    ) -> (Vec<UTXO>, u64) {
+        // Transform each UTXO into an enriched struct that carries an estimated
+        // “effective value” (value minus fee) and its weight.
+
+        // for est in estimates.clone() {
+        //     println!(
+        //         "UTXOEstimate (effective_value: {}, weight: {} )",
+        //         est.utxo.value() - Self::estimate_fee_per_utxo(&est.utxo),
+        //         UTXO_WEIGHT
+        //     );
+        // }
 
         // Recursive branch‑and‑bound search.
         #[allow(clippy::too_many_arguments)]
@@ -326,7 +317,7 @@ impl Wallet {
             let mut incl_set = cur_set.clone();
             incl_set.push(remaining[0].clone());
             let incl_sum = cur_sum + remaining[0].effective_value;
-            let incl_waste = waste(&incl_set, fee_rate);
+            let incl_waste = Wallet::waste(&incl_set, fee_rate);
 
             if incl_sum >= target_interval.0
                 && incl_sum <= target_interval.1
@@ -335,7 +326,7 @@ impl Wallet {
                 *best_sum = incl_sum;
                 *best_set = incl_set.clone();
                 *best_waste = incl_waste;
-                // Found a feasible solution – we can stop exploring this branch.
+                // Found a feasible solution - we can stop exploring this branch.
                 return;
             }
 
@@ -356,7 +347,7 @@ impl Wallet {
                 );
             }
 
-            // ---------- Exclude the head ----------
+            // ---------- Omit the head ----------
             if sum_left as i64 > target_interval.0 as i64 - cur_sum as i64 {
                 recurse(
                     &remaining[1..],
@@ -378,7 +369,7 @@ impl Wallet {
         let mut best_sum = u64::MAX;
         let mut best_waste = u64::MAX;
         recurse(
-            &estimates,
+            estimates,
             0,
             Vec::new(),
             total_sum,
@@ -406,40 +397,131 @@ impl Wallet {
         }
         let fraction_used = elements_tested as f64 / total_elements as f64;
         let new_depth = (max_depth as f64 * (1.0 - fraction_used)).ceil() as i32;
+        println!("The result of the calculate_recursion_depth func is {new_depth}");
         std::cmp::max(new_depth, 1)
     }
+
+    fn dantes_crazy_algorithm_entrypoint(slice: &[UTXO], target: u64) -> Vec<UTXO> {
+        let mut solution: Vec<UtxoEstimate> = Vec::new();
+        let mut solution_waste = u64::MAX;
+
+        let slice_estimates: Vec<UtxoEstimate> = slice
+            .iter()
+            .map(|utxo| UtxoEstimate {
+                utxo: utxo.clone(),
+                effective_value: utxo.value() - Wallet::estimate_fee_per_utxo(utxo),
+                weight: UTXO_WEIGHT,
+            })
+            .collect();
+
+        Self::dantes_crazy_coin_selection_algorithm(
+            &slice_estimates,
+            slice_estimates.len() / 2,
+            &mut solution,
+            &mut solution_waste,
+            target,
+            -1,
+            2, // TODO get the real fee_rate
+            1,
+        );
+
+        solution.into_iter().map(|estimate| estimate.utxo).collect()
+    }
+
     fn dantes_crazy_coin_selection_algorithm(
-        slice: &[UTXO],
-        k: usize,
-        solutions: &mut Vec<Vec<UTXO>>,
+        slice: &[UtxoEstimate],
+        middle_index: usize,
+        solution: &mut Vec<UtxoEstimate>,
+        solution_waste: &mut u64,
         target: u64,
-        mut x: i32, // initialize with -1
+        mut number_of_iterations: i32, // initialize with -1
+        fee_rate: u64,
+        position: u64,
     ) {
-        if x == 0 {
+        if number_of_iterations == -1 {
+            println!("number_of_iterations is {number_of_iterations}");
+        }
+        if position == MAX_ITERATIONS_NON_EXACT_COIN_SELECTION
+            || number_of_iterations == 0
+            || slice.is_empty()
+        {
             return;
         }
         let mut sum = 0;
-        let mut elements: Vec<UTXO> = vec![slice[k].clone()];
-        sum += slice[k].value();
+        let mut elements: Vec<UtxoEstimate> = match slice.get(middle_index) {
+            Some(_) => vec![slice[middle_index].clone()],
+            None => return,
+        };
+        sum += slice[middle_index].utxo.value();
 
-        for i in 0..k {
-            sum += slice[k - i].value();
-            elements.push(slice[k - 1].clone());
+        if number_of_iterations == -1 {
+            println!("number_of_iterations is still {number_of_iterations}");
+        }
+        for k in 2..slice.len() + 1 {
+            // Gets the middle_index + or - k/2 depending on whether k is even or odd. Also checks
+            // if the resulting index is smaller than 0, and if so skips the iteration
+            let index = match k % 2 {
+                1 => {
+                    let x = middle_index as i32 - (k as i32 / 2);
+                    if x < 0 {
+                        continue;
+                    } else {
+                        x as usize
+                    }
+                }
+                0 => middle_index + k / 2,
+                _ => unreachable!(),
+            };
+
+            if let Some(x) = slice.get(index) {
+                sum += x.utxo.value();
+                elements.push(x.clone());
+                // println!(
+                //     "Pushing {} to sum {} on position {position} with target {target}",
+                //     slice[index].utxo.value(),
+                //     sum
+                // );
+            }
             if sum > target {
                 // if there's no x yet, we calculate it here. The x is a function of the number
                 // of elements necessary in the first iteration. If many elements are needed in the
                 // first iteration, that means that if I continue for too many times there will be a
                 // lot of overlap. Therefore, we reduce the size of x
-                if x == -1 {
-                    x = Self::calculate_recursion_depth(MAX_UTXO_SEARCH_DEPTH, i, slice.len());
+                if number_of_iterations == -1 {
+                    number_of_iterations =
+                        Self::calculate_recursion_depth(MAX_UTXO_SEARCH_DEPTH, k, slice.len());
+                    println!("Caculated the recursion depth to be {number_of_iterations}");
+                }
+                let new_waste = Self::waste(&elements, fee_rate);
+                if new_waste < *solution_waste {
+                    *solution = elements.clone();
+                    *solution_waste = new_waste;
                 }
 
-                solutions.push(elements);
                 break;
             }
         }
-        Self::dantes_crazy_coin_selection_algorithm(slice, k / 2, solutions, target, x - 1);
-        Self::dantes_crazy_coin_selection_algorithm(slice, k * 3 / 2, solutions, target, x - 1);
+
+        Self::dantes_crazy_coin_selection_algorithm(
+            slice,
+            middle_index / 2,
+            solution,
+            solution_waste,
+            target,
+            number_of_iterations - 1,
+            fee_rate,
+            position * 2,
+        );
+        Self::dantes_crazy_coin_selection_algorithm(
+            slice,
+            middle_index * 3 / 2,
+            solution,
+            solution_waste,
+            target,
+            number_of_iterations - 1,
+            fee_rate,
+            position * 2 + 1,
+        );
     }
 }
 
