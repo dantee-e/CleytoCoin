@@ -5,7 +5,8 @@ use super::helpers::{
     HTTPResult, Handler, POSTFunc,
 };
 use super::methods::{Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData};
-use crate::chain::transaction::{Transaction, TransactionDeserializeError, TransactionError};
+use crate::chain::transaction::Transaction;
+use crate::error_handling::{TransactionDeserializeError, TransactionError};
 use crate::node::NodeState;
 use chrono::Utc;
 use core::panic;

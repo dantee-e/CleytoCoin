@@ -4,8 +4,9 @@ mod thread_pool;
 pub mod ui;
 mod utils;
 use crate::chain::{transaction::Transaction, Chain};
-use crate::configs::KILL_SERVER_SOCKET_PATH;
+use crate::configs::SOCKETS_DIR;
 use crate::node::logger::Logger;
+use crate::remove_name_from_running_servers;
 use core::panic;
 use directories::ProjectDirs;
 use once_cell::sync::Lazy;
@@ -13,7 +14,7 @@ use resolve_requests::endpoints::resolve_endpoint;
 use resolve_requests::methods::{HTTPParseError, HTTPRequest};
 use serde::{Deserialize, Serialize};
 use std::fs::{self};
-use std::os::unix::net::UnixStream;
+use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{
@@ -34,7 +35,6 @@ pub struct NodeState {
 #[derive(Debug, Serialize, Deserialize)]
 struct NodeConfig {
     log_path: PathBuf,
-    socket_path: PathBuf,
 }
 impl Default for NodeConfig {
     fn default() -> Self {
@@ -42,7 +42,6 @@ impl Default for NodeConfig {
             .expect("Could not find the config directory");
         Self {
             log_path: proj_dirs.data_dir().join("logs.log"),
-            socket_path: PathBuf::from(KILL_SERVER_SOCKET_PATH),
         }
     }
 }
@@ -58,6 +57,12 @@ pub struct Node {
     // The configs are best reloaded with every initialization
     #[serde(skip)]
     config: NodeConfig,
+
+    // The name, for when you finally need to kill it
+    pub name: String,
+
+    // All the socket path accesses should be made from here, never manually, to avoid bugs
+    pub socket_location: PathBuf,
 }
 
 static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
@@ -89,11 +94,17 @@ impl Node {
     pub const DEFAULT_PORT: u16 = 9473;
     pub const REFRESH_RATE_SERVER_IN_MS: u64 = 50;
 
-    pub fn new(chain: Chain) -> (Node, Arc<Logger>) {
+    pub fn new(chain: Chain, name: String) -> (Node, Arc<Logger>) {
         let config = load_config();
         let logger =
             Arc::new(Logger::read_logs_file(&config.log_path).unwrap_or_else(|_| Logger::new()));
         let logger_clone = Arc::clone(&logger);
+        let socket_location = PathBuf::from(format!("{}/{}.sock:", SOCKETS_DIR, name));
+
+        println!(
+            "Creating node with name {name} and socket {}",
+            socket_location.to_string_lossy()
+        );
         (
             Node {
                 state: Arc::new(Mutex::new(NodeState {
@@ -103,6 +114,8 @@ impl Node {
                 })),
                 logger,
                 config,
+                name,
+                socket_location,
             },
             logger_clone,
         )
@@ -241,7 +254,12 @@ impl Node {
             }
         };
 
-        let tcp_listener = TcpListener::bind(format!("127.0.0.1:{port}")).unwrap();
+        println!("Running node of name {}", self.name);
+
+        let tcp_listener = match TcpListener::bind(format!("127.0.0.1:{port}")) {
+            Ok(l) => l,
+            Err(_) => panic!("Trying to create another node in the same port"),
+        };
 
         tcp_listener
             .set_nonblocking(true)
@@ -252,20 +270,33 @@ impl Node {
             Err(e) => panic!("{e}"),
         };
 
-        // The termination signal will be a socket now
-        let parent = self.config.socket_path.parent().unwrap();
-        std::fs::create_dir_all(parent).expect("Could not create temp dirs for parent socket");
+        // The termination signal will come from a socket
+        let parent = self.socket_location.parent().unwrap();
+        std::fs::create_dir_all(parent).expect("Could not create dirs for parent socket");
 
         let mut read_buffer: [u8; 100] = [0u8; 100];
+
+        let unix_listener =
+            UnixListener::bind(self.socket_location.clone()).expect("Could not bind to socket");
+        unix_listener
+            .set_nonblocking(true)
+            .expect("Could not set non-blocking");
+        println!(
+            "Listening on socket {}",
+            self.socket_location.to_string_lossy()
+        );
+
         loop {
-            if let Ok(mut listener) = UnixStream::connect(KILL_SERVER_SOCKET_PATH) {
+            if let Ok((mut listener, _)) = unix_listener.accept() {
                 let command: Option<&str> = match listener.read(&mut read_buffer) {
                     Ok(n) => str::from_utf8(&read_buffer[..n]).ok(),
                     Err(_) => None,
                 };
 
                 match command {
-                    Some("kill") => break,
+                    Some("kill") => {
+                        break;
+                    }
                     Some(&_) => {}
                     None => {}
                 }
@@ -296,13 +327,16 @@ impl Node {
                 }
             }
         }
-
+        let _ = std::fs::remove_file(self.socket_location.clone());
+        remove_name_from_running_servers(self.name.clone());
         println!("Dropping thread pool");
     }
 }
 
 impl Drop for Node {
     fn drop(&mut self) {
+        println!("Deleting socket file and closing connection");
+
         match self.logger.write_logs_file(&self.config.log_path) {
             Ok(_) => {}
             Err(e) => eprintln!("Error saving log file: {e:?}"),

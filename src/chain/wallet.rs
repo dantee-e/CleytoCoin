@@ -428,6 +428,7 @@ impl Wallet {
         solution.into_iter().map(|estimate| estimate.utxo).collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn dantes_crazy_coin_selection_algorithm(
         slice: &[UtxoEstimate],
         middle_index: usize,

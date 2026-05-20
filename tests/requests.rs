@@ -1,7 +1,7 @@
 use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
 use cleyto_coin::chain::utxo::UTXO;
 use cleyto_coin::chain::wallet::Wallet;
-use cleyto_coin::{kill_server, run_server_thread};
+use cleyto_coin::{kill_node, run_server_thread};
 use std::thread;
 
 use reqwest::blocking::Client;
@@ -103,12 +103,13 @@ fn main() {
     // Channel to kill thread
 
     // Run server thread
-    run_server_thread();
+    let server_name = cleyto_coin::new_server_name();
+    run_server_thread(server_name.clone());
 
     // 10.000 breaks the os (client), but the server seems fine
     // Error accepting connection: Too many open files (os error 24)
     thread_get(10);
     thread_post(10);
 
-    kill_server();
+    kill_node(server_name).unwrap();
 }
