@@ -113,12 +113,14 @@ impl Transaction {
     }
 
     pub fn serialize(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        serde_json::to_string_pretty(self).unwrap()
     }
 
     pub fn check_transaction(tx: &Transaction) -> Result<(), TransactionDeserializeError> {
         let input_sum = UTXO::sum(&tx.transaction_info.inputs);
+        println!("Input sum is {input_sum}");
         let output_sum = UTXO::sum(&tx.transaction_info.outputs);
+        println!("Input sum is {output_sum}");
         let change = input_sum as i64 - output_sum as i64;
 
         if change < 1 {

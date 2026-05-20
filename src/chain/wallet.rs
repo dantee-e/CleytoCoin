@@ -191,24 +191,24 @@ impl Wallet {
             .ok_or(WalletError::InsufficientFunds)?
             .clone();
 
-        // Quick check – if the total balance is insufficient we can bail early.
+        // If the total balance is insufficient stop
         if UTXO::sum(&utxos) < amount {
             return Err(WalletError::InsufficientFunds);
         }
 
-        // 1️⃣  Simple exact‑match shortcut.
+        // exact‑match exit
         if let Some(single) = utxos.clone().into_iter().find(|u| u.value() == amount) {
             return Ok(vec![single.clone()]);
         }
 
-        // 2️⃣  Find the smallest UTXO that already exceeds the target.
+        // smallest UTXO that already exceeds the target
         let first_over_idx = utxos
             .clone()
             .into_iter()
             .position(|u| u.value() < amount)
             .unwrap_or(0);
 
-        // 3️⃣  Branch‑and‑bound selection on the remaining (smaller) UTXOs.
+        // Branch‑and‑bound selection on the remaining (smaller) UTXOs.
 
         let dust_threshold = Self::estimate_fee_per_utxo(&utxos[0]) * 3;
         let smaller_utxos = &utxos.get_slice(first_over_idx..utxos.len());

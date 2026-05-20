@@ -25,7 +25,7 @@ fn test_wallet_creation() {
     generate(&receiver_private_key_file, &receiver_public_key_file, &None);
 }
 
-#[tokio::test] //mark a function as a test.
+#[tokio::test]
 #[ignore = "Failing because of insufficient funds, which is correct. I'm not sure how to test it though lol"]
 async fn test_send_transaction() {
     test_wallet_creation();
