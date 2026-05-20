@@ -9,7 +9,7 @@ use openssl::hash::MessageDigest;
 use openssl::pkey::{PKey, Public};
 use openssl::rsa::Rsa;
 use openssl::sign::Verifier;
-use serde::de::{self, Error};
+use serde::de;
 use serde::{Deserialize, Serialize};
 
 // ------------------------------------------- Wallet errors definition --------------------------------------------
@@ -31,37 +31,36 @@ where
     S: serde::Serializer,
 {
     let processed: Vec<u8> = key.public_key_to_pem().map_err(serde::ser::Error::custom)?;
-    processed.serialize(serializer)
+    serializer.serialize_bytes(&processed)
 }
 
 fn deserialize_public_key<'de, D>(deserializer: D) -> Result<PKey<Public>, D::Error>
 where
     D: de::Deserializer<'de>,
 {
-    struct StringVisitor;
-    impl<'de> de::Visitor<'de> for StringVisitor {
-        type Value = PKey<Public>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("The PEM string as a vector of u8")
-        }
-
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
-            PKey::public_key_from_pem(v).map_err(E::custom)
-        }
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            PKey::public_key_from_pem(v.as_bytes()).map_err(E::custom)
-        }
-    }
-
-    // use our visitor to deserialize an `ActualValue`
-    deserializer.deserialize_any(StringVisitor)
+    // struct StringVisitor;
+    // impl<'de> de::Visitor<'de> for StringVisitor {
+    //     type Value = PKey<Public>;
+    //
+    //     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+    //         formatter.write_str("The PEM string as a vector of u8")
+    //     }
+    //
+    //     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    //     where
+    //         E: Error,
+    //     {
+    //         PKey::public_key_from_pem(v).map_err(E::custom)
+    //     }
+    //     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    //     where
+    //         E: de::Error,
+    //     {
+    //         PKey::public_key_from_pem(v.as_bytes()).map_err(E::custom)
+    //     }
+    // }
+    let bytes = Vec::<u8>::deserialize(deserializer).expect("Could not deserialize PEM");
+    Ok(PKey::public_key_from_pem(&bytes).expect("Could not deserialize PEM"))
 }
 // -----------------------------------------------------------------------------------------------------------------
 

@@ -93,13 +93,13 @@ impl Transaction {
         hasher.update(to_hash.as_bytes());
         transaction.txid = hasher.finish().to_owned();
 
-        match transaction.verify() {
+        match transaction.verify_signature() {
             Ok(()) => Ok(transaction),
             Err(error) => Err(error),
         }
     }
 
-    pub(crate) fn verify(&self) -> Result<(), TransactionError> {
+    pub(crate) fn verify_signature(&self) -> Result<(), TransactionError> {
         match self
             .sender
             .verify_transaction_info(&self.transaction_info, &self.signature)
@@ -115,21 +115,17 @@ impl Transaction {
     pub fn serialize(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
-    pub fn deserialize(json: String) -> Result<Transaction, TransactionDeserializeError> {
-        let tx: Transaction = match serde_json::from_str(&json) {
-            Ok(tx) => tx,
-            Err(e) => return Err(TransactionDeserializeError::SerdeError(e)),
-        };
 
+    pub fn check_transaction(tx: &Transaction) -> Result<(), TransactionDeserializeError> {
         let input_sum = UTXO::sum(&tx.transaction_info.inputs);
         let output_sum = UTXO::sum(&tx.transaction_info.outputs);
-        let change = input_sum - output_sum;
+        let change = input_sum as i64 - output_sum as i64;
 
         if change < 1 {
             return Err(TransactionDeserializeError::InsufficientFunds);
         }
 
-        Ok(tx)
+        Ok(())
     }
 }
 

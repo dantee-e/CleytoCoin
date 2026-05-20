@@ -22,8 +22,16 @@ pub fn index(_: &GETData, _: Arc<Mutex<NodeState>>) -> HTTPResult {
 }
 
 pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+    // Deserializes the transactoibn
     let body = data.body.clone().unwrap();
-    let transaction: Transaction = match Transaction::deserialize(body) {
+    let transaction: Transaction = match serde_json::from_str(&body) {
+        Ok(tx) => tx,
+        Err(_) => return Err(HTTPResponseError::InvalidBody(None)),
+    };
+
+    // Check if the funds are enough for the transaction
+
+    match Transaction::check_transaction(&transaction) {
         Ok(tx) => tx,
         Err(e) => {
             return match e {
@@ -38,9 +46,8 @@ pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTP
                 }
             }
         }
-    };
-
-    match transaction.verify() {
+    }
+    match transaction.verify_signature() {
         Ok(()) => {}
         Err(e) => {
             return match e {

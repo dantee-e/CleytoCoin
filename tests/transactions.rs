@@ -119,11 +119,5 @@ fn serialize_and_deserialize_transaction() {
     let serialized_transaction = transaction.serialize();
     println!("serialized_transaction: \n{serialized_transaction}");
 
-    match Transaction::deserialize(serialized_transaction) {
-        Ok(value) => {
-            println!("Success deserializing transaction");
-            value
-        }
-        Err(_) => panic!("Error deserializing transaction"),
-    };
+    let _: Transaction = serde_json::from_str(&serialized_transaction).unwrap();
 }
