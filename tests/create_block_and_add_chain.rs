@@ -1,19 +1,32 @@
-use CleytoCoin::chain::{Chain, wallet::Wallet, block::Block, transaction::{Transaction, TransactionInfo}};
-use chrono::Utc;
+use cleyto_coin::chain::{
+    block::Block,
+    transaction::{Transaction, TransactionInfo},
+    utxo::UTXO,
+    wallet::Wallet,
+    Chain,
+};
 
 #[test]
 fn create_block_and_add_chain() {
-    let (wallet1, mut wallet1_pk) = Wallet::new();
+    let (wallet1, wallet1_pk) = Wallet::new();
     let (wallet2, _) = Wallet::new();
 
-    let transaction_info = TransactionInfo::new(10.5, Utc::now());
+    let input_utxos = vec![
+        UTXO::new(1000, wallet1.clone()),
+        UTXO::new(2000, wallet1.clone()),
+    ];
+    let output_utxos = vec![
+        UTXO::new(2500, wallet2.clone()),
+        UTXO::new(500, wallet2.clone()),
+    ];
+    let transaction_info: TransactionInfo = TransactionInfo::new(input_utxos, output_utxos);
 
     let signature = match wallet1_pk.sign_transaction(&transaction_info) {
         Ok(value) => value,
         Err(e) => panic!("Error creating signed message: {e}"),
     };
 
-    let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature);
+    let new_transaction = Transaction::new(wallet1, wallet2, transaction_info, signature).unwrap();
 
     let mut chain = Chain::new();
 

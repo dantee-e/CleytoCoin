@@ -1,83 +1,162 @@
-//use std::fmt;
+use crate::error_handling::TransactionDeserializeError;
+use crate::error_handling::TransactionError;
 
+use super::utxo::UTXO;
 use super::wallet::Wallet;
-use rsa::pkcs1v15::Signature;
 use chrono::{DateTime, Utc};
+use openssl::sha::Sha256;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::fmt::Debug;
+use std::fmt::Display;
 
-#[derive(Clone)]
-#[derive(Debug)]
-// ---------------------------------------------- TransactionInfo definition ----------------------------------------
+#[derive(Clone, Debug, Serialize, Deserialize)]
+// ---------------------------------------------- TransactionInfo definition -----------------------
 pub struct TransactionInfo {
-    value: f32,
-    date: DateTime<Utc>
+    pub inputs: Vec<UTXO>,
+    pub outputs: Vec<UTXO>,
+    pub date: DateTime<Utc>,
 }
 
 impl TransactionInfo {
-    pub fn new(value: f32, date: DateTime<Utc>) -> TransactionInfo {
+    pub fn new(inputs: Vec<UTXO>, outputs: Vec<UTXO>) -> TransactionInfo {
+        let date = Utc::now();
         Self {
-            value,
-            date
+            inputs,
+            outputs,
+            date,
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        format!(
-            "VALUE::{}::TIME::{}",
-            self.value.to_string(),
-            self.date.to_string()
-        )
+impl Display for TransactionInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let inputs: String = self
+            .inputs
+            .clone()
+            .into_iter()
+            .map(|input| input.to_string())
+            .collect::<Vec<String>>()
+            .join("::");
+
+        let outputs: String = self
+            .outputs
+            .clone()
+            .into_iter()
+            .map(|output| output.to_string())
+            .collect::<Vec<String>>()
+            .join("::");
+
+        write!(f, "INPUTS::{}:OUTPUTS::{}", inputs, outputs)
     }
 }
-// -----------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
-// ---------------------------------------------- Transaction definition -------------------------------------------
-#[derive(Clone)]
+// ------------------------------------- Transaction definition ------------------------------------
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub sender: Wallet,
     pub receiver: Wallet,
-    pub signature: Signature,
+    pub signature: Vec<u8>,
     pub transaction_info: TransactionInfo,
+    pub txid: [u8; 32],
 }
 
+// TODO eventually, I want to make the transactions not need to have the sender adress
 impl Transaction {
-    pub fn new(sender: Wallet, receiver: Wallet, transaction_info: TransactionInfo, signature: Signature) -> Self {
-        
-        let verify_signature = sender.verify_transaction_info(&transaction_info, &signature);
-        
-        if verify_signature {
-            Self {
-                sender,
-                receiver,
-                signature,
-                transaction_info
-            }
-        } else {
-            panic!("Signature couldn't be verified");
+    pub fn new(
+        sender: Wallet,
+        receiver: Wallet,
+        transaction_info: TransactionInfo,
+        signature: Vec<u8>,
+    ) -> Result<Self, TransactionError> {
+        let mut transaction = Self {
+            sender,
+            receiver,
+            signature,
+            transaction_info,
+            txid: [0; 32], // This could be optimized by avoiding the creation of this Vec, which
+                           // serves no function on its own, but I don't really see that being a problem
+        };
+
+        let input_sum = UTXO::sum(&transaction.transaction_info.inputs);
+        let output_sum = UTXO::sum(&transaction.transaction_info.outputs);
+        let change: i64 = input_sum as i64 - output_sum as i64;
+
+        if change < 0 {
+            return Err(TransactionError::InsufficientInputs);
+        }
+
+        let to_hash = transaction.to_string();
+        let mut hasher: Sha256 = Sha256::new();
+        hasher.update(to_hash.as_bytes());
+        transaction.txid = hasher.finish().to_owned();
+
+        match transaction.verify_signature() {
+            Ok(()) => Ok(transaction),
+            Err(error) => Err(error),
         }
     }
 
-    pub fn to_string(&self) -> String {
-        format!(
-            "SENDER::{}::RECEIVER::{}::{}::SIGNATURE::{}",
-            self.sender.to_string(),
-            self.receiver.to_string(),
-            self.transaction_info.to_string(),
-            self.signature.to_string()
+    pub(crate) fn verify_signature(&self) -> Result<(), TransactionError> {
+        match self
+            .sender
+            .verify_transaction_info(&self.transaction_info, &self.signature)
+        {
+            Ok(value) => match value {
+                true => Ok(()),
+                false => Err(TransactionError::ValidationError),
+            },
+            Err(stack) => Err(TransactionError::OpenSSLError(stack)),
+        }
+    }
+
+    pub fn serialize(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap()
+    }
+
+    pub fn check_transaction(tx: &Transaction) -> Result<(), TransactionDeserializeError> {
+        let input_sum = UTXO::sum(&tx.transaction_info.inputs);
+        println!("Input sum is {input_sum}");
+        let output_sum = UTXO::sum(&tx.transaction_info.outputs);
+        println!("Input sum is {output_sum}");
+        let change = input_sum as i64 - output_sum as i64;
+
+        if change < 1 {
+            return Err(TransactionDeserializeError::InsufficientFunds);
+        }
+
+        Ok(())
+    }
+}
+
+impl Default for Transaction {
+    fn default() -> Self {
+        let (sender, sender_pk) = Wallet::new();
+        let (receiver, _) = Wallet::new();
+
+        let value: u32 = rand::random();
+
+        let transaction_info = TransactionInfo::new(
+            vec![UTXO::new(value as u64, sender.clone())],
+            vec![UTXO::new(value as u64, receiver.clone())],
+        );
+
+        let signature = sender_pk.sign_transaction(&transaction_info).unwrap();
+        Transaction::new(sender, receiver, transaction_info, signature).unwrap()
+    }
+}
+
+impl Display for Transaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SENDER::{:?}::RECEIVER::{:?}::{}::SIGNATURE::{:?}",
+            self.sender,
+            self.receiver.to_pem(),
+            self.transaction_info,
+            self.signature
         )
     }
 }
-
-// ---------------------------------------------- UNIT TESTS -------------------------------------------------------
-#[cfg(test)]
-mod tests {
-    use crate::chain::{transaction::TransactionInfo, wallet::Wallet};
-    use chrono::Utc;
-
-    #[test] //mark a function as a test.
-    fn test_transactioninfo_creation() {
-        let transaction: TransactionInfo = TransactionInfo::new(12345 as f32, Utc::now());
-        println!("transaction info:\n{}", transaction.to_string());
-        println!("{:?}", transaction);
-    }
-}
-// -----------------------------------------------------------------------------------------------------------------
