@@ -8,6 +8,7 @@ use super::Chain;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Block {
+    version: u32,
     previous_hash: String,
     transactions: Vec<Transaction>,
     index: u64,
@@ -127,6 +128,7 @@ impl Block {
         let timestamp = Utc::now();
 
         let mut block = Self {
+            version: 1,
             previous_hash,
             transactions,
             index,
@@ -142,6 +144,7 @@ impl Block {
 
     pub fn genesis_block() -> Self {
         Self {
+            version: 1,
             previous_hash: String::from("Foguete nao da re"),
             transactions: Vec::new(),
             index: 1,
@@ -176,6 +179,7 @@ impl Block {
         ];
 
         let mut block = Self {
+            version: 1,
             previous_hash,
             transactions,
             index,

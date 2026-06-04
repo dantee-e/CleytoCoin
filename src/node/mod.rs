@@ -1,10 +1,13 @@
 pub mod logger;
+pub mod ui;
+
+mod data;
 mod resolve_requests;
 mod thread_pool;
-pub mod ui;
 mod utils;
+
 use crate::chain::{transaction::Transaction, Chain};
-use crate::configs::SOCKETS_DIR;
+use crate::configs::ConfigPaths;
 use crate::node::logger::Logger;
 use crate::remove_name_from_running_servers;
 use core::panic;
@@ -99,7 +102,8 @@ impl Node {
         let logger =
             Arc::new(Logger::read_logs_file(&config.log_path).unwrap_or_else(|_| Logger::new()));
         let logger_clone = Arc::clone(&logger);
-        let socket_location = PathBuf::from(format!("{}/{}.sock:", SOCKETS_DIR, name));
+        let socket_location =
+            PathBuf::from(format!("{}/{}.sock:", ConfigPaths::get().sockets_dir, name));
 
         println!(
             "Creating node with name {name} and socket {}",

@@ -5,7 +5,7 @@ use crate::{
         wallet::{Wallet, WalletPK},
         Chain,
     },
-    configs::{SERVERS_NAMES_LIST, SOCKETS_DIR},
+    configs::{ConfigPaths, SERVERS_NAMES_LIST},
     error_handling::{CleytoResult, CleytonError, TransactionError},
     node::ui::App,
 };
@@ -212,7 +212,8 @@ pub fn run_server_new_process(server_name: String) {
 
 /// Sends the kill signal to the server
 pub fn kill_node(node: String) -> CleytoResult<()> {
-    let socket_path = PathBuf::from(format!("{}/{}.sock:", SOCKETS_DIR, node));
+    let config = ConfigPaths::get();
+    let socket_path = PathBuf::from(format!("{}/{}.sock:", config.sockets_dir, node));
 
     println!("Socket exists? {}", socket_path.exists());
     if !socket_path.exists() {
