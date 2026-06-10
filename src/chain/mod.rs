@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct Chain {
-    blocks: Vec<block::Block>,
+    pub blocks: Vec<block::Block>,
 }
 
 impl Chain {

@@ -150,7 +150,7 @@ impl Block {
             index: 1,
             timestamp: Utc::now(),
             hash: String::from(
-                "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks",
+                "The_Times_03_Jan_2009_Chancellor_on_brink_of_second_bailout_for_banks",
             ),
             nonce: 0,
         }

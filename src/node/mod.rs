@@ -1,7 +1,7 @@
+pub mod data;
 pub mod logger;
 pub mod ui;
 
-mod data;
 mod resolve_requests;
 mod thread_pool;
 mod utils;
