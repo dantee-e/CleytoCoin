@@ -26,7 +26,7 @@ impl std::error::Error for WalletError {}
 // -----------------------------------------------------------------------------------------------------------------
 
 // ------------------------------------------------- Serde stuff ---------------------------------------------------
-fn serialize_public_key<S>(key: &PKey<Public>, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_public_key<S>(key: &PKey<Public>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -34,7 +34,7 @@ where
     serializer.serialize_bytes(&processed)
 }
 
-fn deserialize_public_key<'de, D>(deserializer: D) -> Result<PKey<Public>, D::Error>
+pub fn deserialize_public_key<'de, D>(deserializer: D) -> Result<PKey<Public>, D::Error>
 where
     D: de::Deserializer<'de>,
 {

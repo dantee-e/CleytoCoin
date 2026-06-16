@@ -8,12 +8,22 @@ use super::Chain;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Block {
-    version: u32,
+    version: u8,
     previous_hash: String,
     transactions: Vec<Transaction>,
     index: u64,
     timestamp: DateTime<Utc>,
     hash: String,
+    merkle_root: [u8; 32],
+    nonce: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BlockHeader {
+    version: u8,
+    previous_hash: String,
+    timestamp: DateTime<Utc>,
+    merkle_root: [u8; 32],
     nonce: u64,
 }
 
@@ -126,6 +136,7 @@ impl Block {
         let previous_hash = chain.get_last_hash();
         let index = chain.get_last_index() + 1;
         let timestamp = Utc::now();
+        let merkle_root = Self::calculate_merkle_root(&transactions);
 
         let mut block = Self {
             version: 1,
@@ -134,6 +145,7 @@ impl Block {
             index,
             timestamp,
             hash: String::new(),
+            merkle_root,
             nonce: 0, // temporary so that we can calculate hash
         };
 
@@ -143,6 +155,7 @@ impl Block {
     }
 
     pub fn genesis_block() -> Self {
+        let merkle_root = Block::calculate_merkle_root(&vec![]);
         Self {
             version: 1,
             previous_hash: String::from("Foguete nao da re"),
@@ -152,6 +165,7 @@ impl Block {
             hash: String::from(
                 "The_Times_03_Jan_2009_Chancellor_on_brink_of_second_bailout_for_banks",
             ),
+            merkle_root,
             nonce: 0,
         }
     }
@@ -178,6 +192,8 @@ impl Block {
             Transaction::default(),
         ];
 
+        let merkle_root = Block::calculate_merkle_root(&transactions);
+
         let mut block = Self {
             version: 1,
             previous_hash,
@@ -185,6 +201,7 @@ impl Block {
             index,
             timestamp,
             hash: String::new(),
+            merkle_root,
             nonce: 0, // temporary so that we can calculate hash
         };
 
