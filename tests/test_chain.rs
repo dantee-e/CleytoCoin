@@ -19,3 +19,6 @@ fn writing_test_chain() {
         remove_block_by_hash(hash).unwrap();
     }
 }
+
+#[test]
+fn serialize_and_deserialize_chain() {}

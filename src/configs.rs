@@ -1,7 +1,6 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, path::PathBuf};
+
+use crate::error_handling::{CleytoResult, CleytonError};
 
 // pub const CONFIG_PATH: &str = ".config/cleyto_coin"; // /home/
 
@@ -24,6 +23,8 @@ impl ConfigPaths {
 }
 
 pub struct Config {
+    #[allow(dead_code)]
+    // This will be used for a cli command to delete servers
     pub(crate) servers_running: HashSet<String>,
     last_block: u32,
 }
@@ -49,13 +50,19 @@ impl Config {
     pub fn last_block(&self) -> u32 {
         self.last_block
     }
-    pub fn update_last_block(&mut self) {
-        std::fs::write(
-            ConfigPaths::get().last_block,
-            (self.last_block + 1).to_string(),
-        )
-        .expect("Could not update last_block file");
-        self.last_block += 1;
+    pub fn update_last_block(&mut self, amount: i32) -> CleytoResult<()> {
+        let result = {
+            let intermediary = self.last_block as i32 + amount;
+            if intermediary < 0 {
+                return Err(CleytonError::LastBlockLessThanZero);
+            }
+            intermediary as u32
+        };
+
+        std::fs::write(ConfigPaths::get().last_block, result.to_string())
+            .expect("Could not update last_block file");
+        self.last_block = result;
+        Ok(())
     }
 }
 

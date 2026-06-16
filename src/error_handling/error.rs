@@ -11,6 +11,7 @@ pub enum CleytonError {
     BlockDeserializationError(serde_json::Error),
     BlockNotFound,
     ReadWriteError(io::Error),
+    LastBlockLessThanZero,
 }
 
 impl From<io::Error> for CleytonError {
