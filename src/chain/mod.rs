@@ -8,6 +8,8 @@ mod wallet_pk;
 use block::Block;
 use serde::{Deserialize, Serialize};
 
+use crate::chain::block::BlockHeader;
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct Chain {
     pub blocks: Vec<block::Block>,
@@ -20,6 +22,7 @@ impl Chain {
         chain
     }
 
+    /// Adds block without checking anything
     pub fn add_block(&mut self, block: Block) {
         self.blocks.push(block);
     }
@@ -34,14 +37,18 @@ impl Chain {
         self.blocks
             .last()
             .expect("Chain was created without genesis_block")
-            .get_hash()
+            .hash()
     }
 
     pub fn get_last_index(&self) -> u64 {
         self.blocks
             .last()
             .expect("Chain was created without genesis_block")
-            .get_index()
+            .index()
+    }
+
+    pub fn find_block_from_header(&self, header: BlockHeader) -> Option<&Block> {
+        self.blocks.iter().find(|b| b.to_header() == header)
     }
 }
 

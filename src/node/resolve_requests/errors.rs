@@ -7,11 +7,11 @@ pub enum HTTPResponseError {
     InvalidBody(Option<String>),
     InternalServerError(Option<String>),
     BadRequest(Option<String>),
+    ResourceNotFound(Option<String>),
 }
 impl fmt::Display for HTTPResponseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            // If log adds log, else just prints the type of the enum
             HTTPResponseError::InvalidMethod(log) => match log {
                 None => {
                     write!(f, "Invalid Method")
@@ -52,7 +52,27 @@ impl fmt::Display for HTTPResponseError {
                     write!(f, "Bad Request: {}", log)
                 }
             },
+            HTTPResponseError::ResourceNotFound(log) => match log {
+                None => {
+                    write!(f, "Bad Request")
+                }
+                Some(log) => {
+                    write!(f, "Bad Request: {}", log)
+                }
+            },
         }
     }
 }
+
+impl From<openssl::error::Error> for HTTPResponseError {
+    fn from(_: openssl::error::Error) -> Self {
+        HTTPResponseError::InvalidBody(Some("Invalid cryptographic information".to_string()))
+    }
+}
+impl From<openssl::error::ErrorStack> for HTTPResponseError {
+    fn from(_: openssl::error::ErrorStack) -> Self {
+        HTTPResponseError::InvalidBody(Some("Invalid cryptographic information".to_string()))
+    }
+}
+
 impl std::error::Error for HTTPResponseError {}

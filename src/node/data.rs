@@ -16,7 +16,7 @@ pub fn write_block(block: &Block) -> CleytoResult<()> {
         "{}/block_{}_{}.blk",
         ConfigPaths::get().block_dir,
         last_block,
-        block.get_hash(),
+        block.hash(),
     ));
 
     if !std::fs::exists(ConfigPaths::get().block_dir)? {

@@ -1,5 +1,5 @@
 pub mod endpoints;
 pub mod errors;
 pub mod helpers;
-pub mod messages;
+mod messages;
 pub mod methods;

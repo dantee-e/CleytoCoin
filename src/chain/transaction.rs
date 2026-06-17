@@ -1,8 +1,7 @@
-use crate::error_handling::TransactionDeserializeError;
-use crate::error_handling::TransactionError;
-
 use super::utxo::UTXO;
 use super::wallet::Wallet;
+use crate::error_handling::TransactionDeserializeError;
+use crate::error_handling::TransactionError;
 use chrono::{DateTime, Utc};
 use openssl::sha::Sha256;
 use serde::{Deserialize, Serialize};
@@ -63,6 +62,13 @@ pub struct Transaction {
     pub txid: [u8; 32],
 }
 
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+pub struct TransactionHeader {
+    pub sender: Vec<u8>,
+    pub receiver: Vec<u8>,
+    txid: [u8; 32],
+}
+
 // TODO eventually, I want to make the transactions not need to have the sender adress
 impl Transaction {
     pub fn new(
@@ -96,6 +102,14 @@ impl Transaction {
         match transaction.verify_signature() {
             Ok(()) => Ok(transaction),
             Err(error) => Err(error),
+        }
+    }
+
+    pub fn to_header(&self) -> TransactionHeader {
+        TransactionHeader {
+            sender: self.sender.public_key.public_key_to_pem().unwrap(),
+            receiver: self.receiver.public_key.public_key_to_pem().unwrap(),
+            txid: self.txid,
         }
     }
 

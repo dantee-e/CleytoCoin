@@ -18,7 +18,7 @@ pub struct Block {
     nonce: u64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub struct BlockHeader {
     version: u8,
     previous_hash: String,
@@ -28,12 +28,26 @@ pub struct BlockHeader {
 }
 
 impl Block {
-    pub fn get_hash(&self) -> String {
+    pub fn hash(&self) -> String {
         self.hash.clone()
     }
 
-    pub fn get_index(&self) -> u64 {
+    pub fn index(&self) -> u64 {
         self.index
+    }
+
+    pub fn to_header(&self) -> BlockHeader {
+        BlockHeader {
+            version: self.version,
+            previous_hash: self.previous_hash.clone(),
+            timestamp: self.timestamp,
+            merkle_root: self.merkle_root,
+            nonce: self.nonce,
+        }
+    }
+
+    pub fn previous_hash(&self) -> String {
+        self.previous_hash.clone()
     }
 
     /// This merkle tree does not work the same way as the bitcoin core one. If the number of
@@ -155,7 +169,7 @@ impl Block {
     }
 
     pub fn genesis_block() -> Self {
-        let merkle_root = Block::calculate_merkle_root(&vec![]);
+        let merkle_root = Block::calculate_merkle_root(&[]);
         Self {
             version: 1,
             previous_hash: String::from("Foguete nao da re"),

@@ -22,9 +22,16 @@ pub enum Content {
 
 pub enum HTTPResponse {
     OK(Option<Content>),
+    /// Don't use directly. Instead, return the error Err(HTTPResponseError::InvalidMethod), so
+    /// that the errors can be properly handled
     InvalidMethod,
+    /// Don't use directly. Instead, return the error Err(HTTPResponseError::BadRequest), so
+    /// that the errors can be properly handled
     BadRequest,
+    /// Don't use directly. Instead, return the error Err(HTTPResponseError::InternalServerError), so
+    /// that the errors can be properly handled
     InternalServerError,
+    ResourceNotFound,
 }
 
 #[derive(Debug, Clone)]
@@ -225,6 +232,22 @@ impl HTTPRequest {
                         500,
                         "text/plain",
                         b"500 Internal Server Error".to_vec(),
+                    ))
+                }
+            }
+            HTTPResponse::ResourceNotFound => {
+                if accept.unwrap_or("").contains("text/html") {
+                    Ok(Response::new(
+                        405,
+                        "text/html",
+                        fs::read("static/405.html")
+                            .unwrap_or_else(|_| b"405 Invalid Method".to_vec()),
+                    ))
+                } else {
+                    Ok(Response::new(
+                        405,
+                        "text/plain",
+                        b"405 Invalid Method".to_vec(),
                     ))
                 }
             }

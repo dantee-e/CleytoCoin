@@ -16,6 +16,7 @@ use once_cell::sync::Lazy;
 use resolve_requests::endpoints::resolve_endpoint;
 use resolve_requests::methods::{HTTPParseError, HTTPRequest};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs::{self};
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
@@ -29,11 +30,21 @@ use std::{
 };
 use thread_pool::custom_thread_pool::ThreadPool;
 
+#[derive(Serialize, Deserialize, PartialEq, Hash, Eq)]
+pub struct ConnectedNodeInfo {
+    pub public_key: Vec<u8>,
+    pub address: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct NodeState {
     status: bool,
     chain: Chain,
     transactions_pool: Vec<Transaction>,
+    /*
+     TODO make a better implementation of that
+    */
+    connected_nodes: HashSet<ConnectedNodeInfo>, // very naive way to do it, I'll just store the public keys
 }
 #[derive(Debug, Serialize, Deserialize)]
 struct NodeConfig {
@@ -115,6 +126,7 @@ impl Node {
                     status: true,
                     chain,
                     transactions_pool: Vec::new(),
+                    connected_nodes: HashSet::new(),
                 })),
                 logger,
                 config,

@@ -4,10 +4,17 @@ use super::helpers::{
     method_not_allowed, path_not_found, return_html, return_image, return_json, GETFunc,
     HTTPResult, Handler, POSTFunc,
 };
+use super::messages::process::{
+    check_block_by_block_header, check_transaction_by_transaction_header, process_get_data_block,
+    process_get_data_transaction, process_new_block,
+};
+use super::messages::{GetDataMessage, Message};
 use super::methods::{Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData};
 use crate::chain::transaction::Transaction;
 use crate::error_handling::{TransactionDeserializeError, TransactionError};
+use crate::node::resolve_requests::messages::process::process_new_node;
 use crate::node::NodeState;
+
 use chrono::Utc;
 use core::panic;
 use serde_json::json;
@@ -20,6 +27,8 @@ use std::sync::{Arc, Mutex};
 pub fn index(_: &GETData, _: Arc<Mutex<NodeState>>) -> HTTPResult {
     return_html("index.html")
 }
+
+// pub fn send_message(message: Message) -> CleytoResult<()> {}
 
 pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
     // Deserializes the transactoibn
@@ -101,16 +110,52 @@ pub fn status(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
     }))
 }
 
+pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+    let body = data.body.clone().unwrap();
+    let message: Message =
+        serde_json::from_str(&body).map_err(|_| HTTPResponseError::InvalidBody(None))?;
+
+    match message {
+        Message::CheckBlock(block_header) => {
+            let chain = &state.lock().unwrap().chain;
+            check_block_by_block_header(block_header, chain)
+        }
+        Message::Block(block) => {
+            let chain = &mut state.lock().unwrap().chain;
+            process_new_block(block, chain)
+        }
+        Message::NewNode(new_node_message) => {
+            let connected_nodes = &mut state.lock().unwrap().connected_nodes;
+            process_new_node(new_node_message, connected_nodes)
+        }
+        Message::KeyRefresh => todo!(),
+        Message::CheckTransaction(transaction_header) => {
+            let transaction_pool = &state.lock().unwrap().transactions_pool;
+            check_transaction_by_transaction_header(transaction_header, transaction_pool)
+        }
+        Message::GetData(get_data_message) => match get_data_message {
+            GetDataMessage::Block(block_header) => {
+                let chain = &state.lock().unwrap().chain;
+                process_get_data_block(block_header, chain)
+            }
+            GetDataMessage::Transaction(transaction_header) => {
+                let transaction_pool = &state.lock().unwrap().transactions_pool;
+                process_get_data_transaction(transaction_header, transaction_pool)
+            }
+        },
+    }
+}
+
 pub fn resolve_endpoint(
     state: Arc<Mutex<NodeState>>,
     mut request: HTTPRequest,
 ) -> Result<Option<String>, Option<String>> {
     /*
     TODO: This creates the endpoints var every time the resolve_endpoints function runs,
-     which is inefficient. We should move the creation of the endpoints var to the
-     initialization of the program, and pass it around as a parameter to the functions that
-     need it
-     */
+    which is inefficient. We should move the creation of the endpoints var to the
+    initialization of the program, and pass it around as a parameter to the functions that
+    need it
+    */
 
     fn curry_add_endpoint<'a, 'b>(
         endpoints: &'b mut HashMap<&'a str, HashMap<&'a str, Box<dyn Handler>>>,
@@ -136,6 +181,7 @@ pub fn resolve_endpoint(
             add_endpoints("/status", Some(status), None);
             add_endpoints("/submit-transaction", None, Some(submit_transaction));
             add_endpoints("/get-transaction-pool", Some(get_transaction_pool), None);
+            add_endpoints("/messages", None, Some(messages));
         }
         endpoints
     }
@@ -187,6 +233,10 @@ pub fn resolve_endpoint(
             }
             HTTPResponseError::BadRequest(log) => {
                 request.response(HTTPResponse::BadRequest);
+                Err(log)
+            }
+            HTTPResponseError::ResourceNotFound(log) => {
+                request.response(HTTPResponse::ResourceNotFound);
                 Err(log)
             }
         },

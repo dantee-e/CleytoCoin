@@ -59,11 +59,13 @@ pub fn return_image(path: &str, image_type: ImageType) -> HTTPResult {
         image_type,
     ))))
 }
+
 pub fn return_html(path: &str) -> HTTPResult {
     Ok(HTTPResponse::OK(Some(Content::HTML(PathBuf::from(
         STATIC_FOLDER.to_owned() + path,
     )))))
 }
+
 pub fn return_json(json: serde_json::Value) -> HTTPResult {
     Ok(HTTPResponse::OK(Some(Content::JSON(json))))
 }
