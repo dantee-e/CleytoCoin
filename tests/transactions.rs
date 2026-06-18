@@ -15,7 +15,8 @@ fn create_transaction() {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_receiver.clone()),
     ];
-    let transaction_info: TransactionInfo = TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: TransactionInfo =
+        TransactionInfo::new(input_utxos, output_utxos);
 
     let signature = match walletpk_sender.sign_transaction(&transaction_info) {
         Ok(signed_hashed_message) => signed_hashed_message,
@@ -36,8 +37,13 @@ fn create_transaction() {
         println!("transaction not verified");
     }
 
-    let transaction: Transaction =
-        Transaction::new(wallet_sender, wallet_receiver, transaction_info, signature).unwrap();
+    let transaction: Transaction = Transaction::new(
+        wallet_sender,
+        wallet_receiver,
+        transaction_info,
+        signature,
+    )
+    .unwrap();
 
     println!("transaction.to_string(): {}", transaction);
 }
@@ -55,7 +61,8 @@ fn test_transaction_info_creation() {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_receiver.clone()),
     ];
-    let transaction_info: TransactionInfo = TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: TransactionInfo =
+        TransactionInfo::new(input_utxos, output_utxos);
     println!("transaction info:\n{}", transaction_info);
     println!("{:?}", transaction_info);
 }
@@ -73,7 +80,8 @@ fn sign_and_verify_transaction_info() {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_receiver.clone()),
     ];
-    let transaction_info: TransactionInfo = TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: TransactionInfo =
+        TransactionInfo::new(input_utxos, output_utxos);
 
     let signature = match wallet_pk.sign_transaction(&transaction_info) {
         Ok(signed_hashed_message) => signed_hashed_message,
@@ -107,14 +115,16 @@ fn serialize_and_deserialize_transaction() {
         UTXO::new(2500, mallet.clone()),
         UTXO::new(500, mallet.clone()),
     ];
-    let transaction_info: TransactionInfo = TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: TransactionInfo =
+        TransactionInfo::new(input_utxos, output_utxos);
 
     let signature = match wallet_pk.sign_transaction(&transaction_info) {
         Ok(signed_hashed_message) => signed_hashed_message,
         _ => panic!("error while signing transaction"),
     };
 
-    let transaction = Transaction::new(wallet, mallet, transaction_info, signature).unwrap();
+    let transaction =
+        Transaction::new(wallet, mallet, transaction_info, signature).unwrap();
 
     let serialized_transaction = transaction.serialize();
     println!("serialized_transaction: \n{serialized_transaction}");

@@ -11,7 +11,10 @@ use crate::{
     },
 };
 
-pub fn process_get_data_block(header: BlockHeader, chain: &Chain) -> HTTPResult {
+pub fn process_get_data_block(
+    header: BlockHeader,
+    chain: &Chain,
+) -> HTTPResult {
     let block = chain.find_block_from_header(header);
     if let Some(block) = block {
         let value = serde_json::to_value(block).unwrap();

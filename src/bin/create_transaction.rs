@@ -42,7 +42,8 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_sender.clone()),
     ];
-    let transactioninfo: TransactionInfo = TransactionInfo::new(input_utxos, output_utxos);
+    let transactioninfo: TransactionInfo =
+        TransactionInfo::new(input_utxos, output_utxos);
 
     let signature = match walletpk_sender.sign_transaction(&transactioninfo) {
         Ok(signed_hashed_message) => signed_hashed_message,
@@ -53,8 +54,13 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
         signature
     );
 
-    let transaction: Transaction =
-        Transaction::new(wallet_sender, wallet_receiver, transactioninfo, signature).unwrap();
+    let transaction: Transaction = Transaction::new(
+        wallet_sender,
+        wallet_receiver,
+        transactioninfo,
+        signature,
+    )
+    .unwrap();
     let transaction_json = transaction.serialize();
 
     // Send the POST request

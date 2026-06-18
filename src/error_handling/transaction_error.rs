@@ -11,9 +11,15 @@ pub enum TransactionDeserializeError {
 impl fmt::Display for TransactionDeserializeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TransactionDeserializeError::InsufficientFunds => write!(f, "Insufficient funds"),
-            TransactionDeserializeError::MalformedTransaction => write!(f, "Malformed transaction"),
-            TransactionDeserializeError::SerdeError(value) => write!(f, "{}", value),
+            TransactionDeserializeError::InsufficientFunds => {
+                write!(f, "Insufficient funds")
+            }
+            TransactionDeserializeError::MalformedTransaction => {
+                write!(f, "Malformed transaction")
+            }
+            TransactionDeserializeError::SerdeError(value) => {
+                write!(f, "{}", value)
+            }
         }
     }
 }

@@ -24,9 +24,14 @@ mod configs;
 pub mod error_handling;
 pub mod node;
 
-pub use configs::{add_name_to_running_servers, new_server_name, remove_name_from_running_servers};
+pub use configs::{
+    add_name_to_running_servers, new_server_name,
+    remove_name_from_running_servers,
+};
 
-async fn send_transaction(transaction: transaction::Transaction) -> Result<(), TransactionError> {
+async fn send_transaction(
+    transaction: transaction::Transaction,
+) -> Result<(), TransactionError> {
     let client = Client::new();
 
     let transaction_json = transaction.serialize();
@@ -52,7 +57,10 @@ async fn send_transaction(transaction: transaction::Transaction) -> Result<(), T
     }
 }
 
-fn read_key_string_or_file(string: &Option<String>, file: &Option<PathBuf>) -> String {
+fn read_key_string_or_file(
+    string: &Option<String>,
+    file: &Option<PathBuf>,
+) -> String {
     if let Some(s) = string {
         s.clone()
     } else if let Some(path) = file {
@@ -62,7 +70,11 @@ fn read_key_string_or_file(string: &Option<String>, file: &Option<PathBuf>) -> S
     }
 }
 
-pub fn generate(private_key_file: &PathBuf, public_key_file: &PathBuf, password: &Option<String>) {
+pub fn generate(
+    private_key_file: &PathBuf,
+    public_key_file: &PathBuf,
+    password: &Option<String>,
+) {
     let (wallet, walletpk) = Wallet::new();
 
     let parents = [
@@ -77,13 +89,17 @@ pub fn generate(private_key_file: &PathBuf, public_key_file: &PathBuf, password:
     // Checks to see if parents exist. if not, creates them
     for parent in parents {
         if !parent.exists() {
-            std::fs::create_dir_all(parent).expect("Could not create parent directory");
+            std::fs::create_dir_all(parent)
+                .expect("Could not create parent directory");
         }
     }
 
     if let Some(password) = password {
-        std::fs::write(private_key_file, walletpk.to_pem_with_password(password))
-            .expect("Could not write new wallet's private key to file");
+        std::fs::write(
+            private_key_file,
+            walletpk.to_pem_with_password(password),
+        )
+        .expect("Could not write new wallet's private key to file");
     } else {
         std::fs::write(private_key_file, walletpk.to_pem())
             .expect("Could not write new wallet's private key to file");
@@ -101,20 +117,25 @@ pub async fn send(
     password: Option<String>,
     amount: u64,
 ) -> Result<(), TransactionError> {
-    let recipient_key_str = read_key_string_or_file(&recipient_key, &recipient_key_file);
+    let recipient_key_str =
+        read_key_string_or_file(&recipient_key, &recipient_key_file);
     let sender_key_str = read_key_string_or_file(&sender_key, &sender_key_file);
 
     // convert to PKey objects
     let sender_pkey: PKey<Private> = if let Some(password) = password {
-        PKey::private_key_from_pem_passphrase(sender_key_str.as_bytes(), password.as_bytes())
-            .expect("Failed to parse sender private key")
+        PKey::private_key_from_pem_passphrase(
+            sender_key_str.as_bytes(),
+            password.as_bytes(),
+        )
+        .expect("Failed to parse sender private key")
     } else {
         PKey::private_key_from_pem(sender_key_str.as_bytes())
             .expect("Failed to parse sender private key")
     };
 
-    let recipient_pkey: PKey<Public> = PKey::public_key_from_pem(recipient_key_str.as_bytes())
-        .expect("Failed to parse recipient public key");
+    let recipient_pkey: PKey<Public> =
+        PKey::public_key_from_pem(recipient_key_str.as_bytes())
+            .expect("Failed to parse recipient public key");
 
     // create wallets
     let sender_wallet = WalletPK::from(sender_pkey);
@@ -129,7 +150,8 @@ pub async fn send(
     // Create output UTXOs
     let input_sum = UTXO::sum(&input_utxos);
     let recipients_utxo = UTXO::new(amount, recipient_wallet.clone());
-    let change_utxo = UTXO::new(input_sum - amount, sender_wallet.public_wallet());
+    let change_utxo =
+        UTXO::new(input_sum - amount, sender_wallet.public_wallet());
     let output_utxos = vec![change_utxo, recipients_utxo];
 
     // create transaction info
@@ -168,7 +190,8 @@ pub fn run_server_with_gui(server_name: String) -> color_eyre::Result<()> {
 
     color_eyre::install()?;
     let terminal = ratatui::init();
-    let result = App::new(Arc::clone(&logger), node::Node::DEFAULT_PORT).run(terminal);
+    let result =
+        App::new(Arc::clone(&logger), node::Node::DEFAULT_PORT).run(terminal);
     ratatui::restore();
 
     // Quits server
@@ -213,7 +236,8 @@ pub fn run_server_new_process(server_name: String) {
 /// Sends the kill signal to the server
 pub fn kill_node(node: String) -> CleytoResult<()> {
     let config = ConfigPaths::get();
-    let socket_path = PathBuf::from(format!("{}/{}.sock:", config.sockets_dir, node));
+    let socket_path =
+        PathBuf::from(format!("{}/{}.sock:", config.sockets_dir, node));
 
     println!("Socket exists? {}", socket_path.exists());
     if !socket_path.exists() {
@@ -239,7 +263,8 @@ pub fn kill_node(node: String) -> CleytoResult<()> {
 
     println!("Killed node {}", node);
 
-    std::fs::remove_file(socket_path).map_err(|e| CleytonError::KillServerError(e.to_string()))?;
+    std::fs::remove_file(socket_path)
+        .map_err(|e| CleytonError::KillServerError(e.to_string()))?;
     remove_name_from_running_servers(node);
 
     Ok(())

@@ -26,15 +26,21 @@ impl std::error::Error for WalletError {}
 // -----------------------------------------------------------------------------------------------------------------
 
 // ------------------------------------------------- Serde stuff ---------------------------------------------------
-pub fn serialize_public_key<S>(key: &PKey<Public>, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_public_key<S>(
+    key: &PKey<Public>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    let processed: Vec<u8> = key.public_key_to_pem().map_err(serde::ser::Error::custom)?;
+    let processed: Vec<u8> =
+        key.public_key_to_pem().map_err(serde::ser::Error::custom)?;
     serializer.serialize_bytes(&processed)
 }
 
-pub fn deserialize_public_key<'de, D>(deserializer: D) -> Result<PKey<Public>, D::Error>
+pub fn deserialize_public_key<'de, D>(
+    deserializer: D,
+) -> Result<PKey<Public>, D::Error>
 where
     D: de::Deserializer<'de>,
 {
@@ -59,7 +65,8 @@ where
     //         PKey::public_key_from_pem(v.as_bytes()).map_err(E::custom)
     //     }
     // }
-    let bytes = Vec::<u8>::deserialize(deserializer).expect("Could not deserialize PEM");
+    let bytes = Vec::<u8>::deserialize(deserializer)
+        .expect("Could not deserialize PEM");
     Ok(PKey::public_key_from_pem(&bytes).expect("Could not deserialize PEM"))
 }
 // -----------------------------------------------------------------------------------------------------------------
@@ -73,10 +80,11 @@ impl PartialEq for Wallet {
 
 impl From<String> for Wallet {
     fn from(value: String) -> Self {
-        let public_rsa = openssl::rsa::Rsa::public_key_from_pem(value.as_bytes())
-            .expect("Could not read the public key");
-        let public_key =
-            PKey::from_rsa(public_rsa).expect("Error converting from RSA to PKey<Public>");
+        let public_rsa =
+            openssl::rsa::Rsa::public_key_from_pem(value.as_bytes())
+                .expect("Could not read the public key");
+        let public_key = PKey::from_rsa(public_rsa)
+            .expect("Error converting from RSA to PKey<Public>");
         Self {
             public_key,
             available_utxos: None,
@@ -150,7 +158,8 @@ impl Wallet {
         transaction_info: &TransactionInfo,
         signature: &[u8],
     ) -> Result<bool, ErrorStack> {
-        let mut verifier = Verifier::new(MessageDigest::sha256(), &self.public_key)?;
+        let mut verifier =
+            Verifier::new(MessageDigest::sha256(), &self.public_key)?;
         verifier.update(transaction_info.to_string().as_bytes())?;
         verifier.verify(signature)
     }
@@ -197,7 +206,9 @@ impl Wallet {
         }
 
         // exact‑match exit
-        if let Some(single) = utxos.clone().into_iter().find(|u| u.value() == amount) {
+        if let Some(single) =
+            utxos.clone().into_iter().find(|u| u.value() == amount)
+        {
             return Ok(vec![single.clone()]);
         }
 
@@ -252,7 +263,8 @@ impl Wallet {
         }
 
         let target = amount + dust_threshold;
-        let solution = Self::dantes_crazy_algorithm_entrypoint(smaller_utxos, target);
+        let solution =
+            Self::dantes_crazy_algorithm_entrypoint(smaller_utxos, target);
 
         if solution.is_empty() {
             return Err(WalletError::InsufficientFunds);
@@ -395,12 +407,18 @@ impl Wallet {
             return 0;
         }
         let fraction_used = elements_tested as f64 / total_elements as f64;
-        let new_depth = (max_depth as f64 * (1.0 - fraction_used)).ceil() as i32;
-        println!("The result of the calculate_recursion_depth func is {new_depth}");
+        let new_depth =
+            (max_depth as f64 * (1.0 - fraction_used)).ceil() as i32;
+        println!(
+            "The result of the calculate_recursion_depth func is {new_depth}"
+        );
         std::cmp::max(new_depth, 1)
     }
 
-    fn dantes_crazy_algorithm_entrypoint(slice: &[UTXO], target: u64) -> Vec<UTXO> {
+    fn dantes_crazy_algorithm_entrypoint(
+        slice: &[UTXO],
+        target: u64,
+    ) -> Vec<UTXO> {
         let mut solution: Vec<UtxoEstimate> = Vec::new();
         let mut solution_waste = u64::MAX;
 
@@ -408,7 +426,8 @@ impl Wallet {
             .iter()
             .map(|utxo| UtxoEstimate {
                 utxo: utxo.clone(),
-                effective_value: utxo.value() - Wallet::estimate_fee_per_utxo(utxo),
+                effective_value: utxo.value()
+                    - Wallet::estimate_fee_per_utxo(utxo),
                 weight: UTXO_WEIGHT,
             })
             .collect();
@@ -488,8 +507,11 @@ impl Wallet {
                 // first iteration, that means that if I continue for too many times there will be a
                 // lot of overlap. Therefore, we reduce the size of x
                 if number_of_iterations == -1 {
-                    number_of_iterations =
-                        Self::calculate_recursion_depth(MAX_UTXO_SEARCH_DEPTH, k, slice.len());
+                    number_of_iterations = Self::calculate_recursion_depth(
+                        MAX_UTXO_SEARCH_DEPTH,
+                        k,
+                        slice.len(),
+                    );
                     println!("Caculated the recursion depth to be {number_of_iterations}");
                 }
                 let new_waste = Self::waste(&elements, fee_rate);

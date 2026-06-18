@@ -66,12 +66,16 @@ impl fmt::Display for HTTPResponseError {
 
 impl From<openssl::error::Error> for HTTPResponseError {
     fn from(_: openssl::error::Error) -> Self {
-        HTTPResponseError::InvalidBody(Some("Invalid cryptographic information".to_string()))
+        HTTPResponseError::InvalidBody(Some(
+            "Invalid cryptographic information".to_string(),
+        ))
     }
 }
 impl From<openssl::error::ErrorStack> for HTTPResponseError {
     fn from(_: openssl::error::ErrorStack) -> Self {
-        HTTPResponseError::InvalidBody(Some("Invalid cryptographic information".to_string()))
+        HTTPResponseError::InvalidBody(Some(
+            "Invalid cryptographic information".to_string(),
+        ))
     }
 }
 

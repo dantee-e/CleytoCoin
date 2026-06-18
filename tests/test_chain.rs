@@ -11,7 +11,8 @@ fn writing_test_chain() {
     use cleyto_coin::chain::testing::test_chain;
     let chain = test_chain();
 
-    let hashes: Vec<String> = chain.blocks.iter().map(|block| block.hash()).collect();
+    let hashes: Vec<String> =
+        chain.blocks.iter().map(|block| block.hash()).collect();
 
     write_chain_blocks(&chain).unwrap();
 

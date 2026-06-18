@@ -1,6 +1,6 @@
 use cleyto_coin::{
-    add_name_to_running_servers, kill_all_nodes, kill_node, new_server_name, run_server,
-    run_server_new_process, run_server_with_gui,
+    add_name_to_running_servers, kill_all_nodes, kill_node, new_server_name,
+    run_server, run_server_new_process, run_server_with_gui,
 };
 use structopt::StructOpt;
 
@@ -38,7 +38,8 @@ fn main() {
             if all {
                 kill_all_nodes();
             } else {
-                let node = node.expect("Provide a node name or use the --all flag");
+                let node =
+                    node.expect("Provide a node name or use the --all flag");
                 kill_node(node).expect("Couldn't kill node");
             }
         }

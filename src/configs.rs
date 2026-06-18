@@ -14,7 +14,9 @@ pub struct ConfigPaths {
 impl ConfigPaths {
     pub fn get() -> Self {
         ConfigPaths {
-            servers_running_file: String::from(".config/cleyto_coin/servers_running.json"),
+            servers_running_file: String::from(
+                ".config/cleyto_coin/servers_running.json",
+            ),
             sockets_dir: String::from(".config/cleyto_coin/sockets"),
             block_dir: String::from(".cleyto_coin/blocks"),
             last_block: String::from(".cleyto_coin/last_block"),
@@ -32,11 +34,13 @@ impl Config {
     pub fn get() -> Self {
         let last_block_path = PathBuf::from(ConfigPaths::get().last_block);
         let last_block = match std::fs::read_to_string(&last_block_path) {
-            Ok(v) => str::parse::<u32>(&v).expect("Last block file has non uinteger value"),
+            Ok(v) => str::parse::<u32>(&v)
+                .expect("Last block file has non uinteger value"),
             Err(_) => {
                 std::fs::create_dir_all(last_block_path.parent().unwrap())
                     .expect("Could not create dir .cleyto_coin");
-                std::fs::write(last_block_path, "0").expect("Could not create last_block file");
+                std::fs::write(last_block_path, "0")
+                    .expect("Could not create last_block file");
                 0
             }
         };
@@ -119,7 +123,8 @@ pub const SERVERS_NAMES_LIST: [&str; 48] = [
 
 pub fn new_server_name() -> String {
     let config = ConfigPaths::get();
-    let contents = std::fs::read_to_string(config.servers_running_file).unwrap_or("[]".to_string());
+    let contents = std::fs::read_to_string(config.servers_running_file)
+        .unwrap_or("[]".to_string());
     let servers_running: HashSet<String> = serde_json::from_str(&contents)
         .expect("Badly formed ~/.config/cleyto_coin/servers_running.json");
 
@@ -135,7 +140,8 @@ pub fn new_server_name() -> String {
 
 pub fn get_running_servers() -> HashSet<String> {
     let config = ConfigPaths::get();
-    let contents = std::fs::read_to_string(config.servers_running_file).unwrap_or("[]".to_string());
+    let contents = std::fs::read_to_string(config.servers_running_file)
+        .unwrap_or("[]".to_string());
     serde_json::from_str(&contents)
         .expect("Badly formed ~/.config/cleyto_coin/servers_running.json")
 }
@@ -145,7 +151,9 @@ pub fn add_name_to_running_servers(name: String) {
     servers_running.insert(name);
 
     let config = ConfigPaths::get();
-    if let Some(parent) = std::path::Path::new(&config.servers_running_file).parent() {
+    if let Some(parent) =
+        std::path::Path::new(&config.servers_running_file).parent()
+    {
         std::fs::create_dir_all(parent).unwrap();
     }
     std::fs::write(
@@ -161,7 +169,9 @@ pub fn remove_name_from_running_servers(name: String) {
 
     let config = ConfigPaths::get();
 
-    if let Some(parent) = std::path::Path::new(&config.servers_running_file).parent() {
+    if let Some(parent) =
+        std::path::Path::new(&config.servers_running_file).parent()
+    {
         std::fs::create_dir_all(parent).unwrap();
     }
     std::fs::write(

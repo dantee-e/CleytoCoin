@@ -47,7 +47,10 @@ impl Chain {
             .index()
     }
 
-    pub fn find_block_from_header(&self, header: BlockHeader) -> Option<&Block> {
+    pub fn find_block_from_header(
+        &self,
+        header: BlockHeader,
+    ) -> Option<&Block> {
         self.blocks.iter().find(|b| b.to_header() == header)
     }
 }
@@ -75,7 +78,8 @@ pub mod testing {
             UTXO::new(50000, wallet_2.0.clone()),
         ];
         let transaction_info_1 = TransactionInfo::new(utxos_1, utxos_1_output);
-        let signature_1 = wallet_1.1.sign_transaction(&transaction_info_1).unwrap();
+        let signature_1 =
+            wallet_1.1.sign_transaction(&transaction_info_1).unwrap();
         let transaction_1 = Transaction::new(
             wallet_1.0.clone(),
             wallet_2.0.clone(),
@@ -93,7 +97,8 @@ pub mod testing {
         let utxos_2 = vec![UTXO::new(50000, wallet_1.0.clone())];
         let utxos_2_output = vec![UTXO::new(50000, wallet_3.0.clone())];
         let transaction_info_2 = TransactionInfo::new(utxos_2, utxos_2_output);
-        let signature_2 = wallet_1.1.sign_transaction(&transaction_info_2).unwrap();
+        let signature_2 =
+            wallet_1.1.sign_transaction(&transaction_info_2).unwrap();
         let transaction_2 = Transaction::new(
             wallet_1.0.clone(),
             wallet_3.0.clone(),
@@ -108,7 +113,8 @@ pub mod testing {
             UTXO::new(25000, wallet_4.0.clone()),
         ];
         let transaction_info_3 = TransactionInfo::new(utxos_3, utxos_3_output);
-        let signature_3 = wallet_2.1.sign_transaction(&transaction_info_3).unwrap();
+        let signature_3 =
+            wallet_2.1.sign_transaction(&transaction_info_3).unwrap();
         let transaction_3 = Transaction::new(
             wallet_2.0.clone(),
             wallet_4.0.clone(),
@@ -117,7 +123,8 @@ pub mod testing {
         )
         .unwrap();
 
-        let block_2 = Block::new(&mut chain, vec![transaction_2, transaction_3]);
+        let block_2 =
+            Block::new(&mut chain, vec![transaction_2, transaction_3]);
         chain.add_block(block_2);
 
         // --- Block 3: wallet_3 consolidates its 75000 and sends it all to wallet_5,
@@ -128,7 +135,8 @@ pub mod testing {
         ];
         let utxos_4_output = vec![UTXO::new(75000, wallet_5.0.clone())];
         let transaction_info_4 = TransactionInfo::new(utxos_4, utxos_4_output);
-        let signature_4 = wallet_3.1.sign_transaction(&transaction_info_4).unwrap();
+        let signature_4 =
+            wallet_3.1.sign_transaction(&transaction_info_4).unwrap();
         let transaction_4 = Transaction::new(
             wallet_3.0.clone(),
             wallet_5.0.clone(),
@@ -143,7 +151,8 @@ pub mod testing {
             UTXO::new(15000, wallet_5.0.clone()),
         ];
         let transaction_info_5 = TransactionInfo::new(utxos_5, utxos_5_output);
-        let signature_5 = wallet_4.1.sign_transaction(&transaction_info_5).unwrap();
+        let signature_5 =
+            wallet_4.1.sign_transaction(&transaction_info_5).unwrap();
         let transaction_5 = Transaction::new(
             wallet_4.0.clone(),
             wallet_5.0.clone(),
@@ -152,7 +161,8 @@ pub mod testing {
         )
         .unwrap();
 
-        let block_3 = Block::new(&mut chain, vec![transaction_4, transaction_5]);
+        let block_3 =
+            Block::new(&mut chain, vec![transaction_4, transaction_5]);
         chain.add_block(block_3);
 
         // --- Block 4: wallet_5 distributes its 90000 back to everyone ---
@@ -168,7 +178,8 @@ pub mod testing {
             UTXO::new(10000, wallet_5.0.clone()),
         ];
         let transaction_info_6 = TransactionInfo::new(utxos_6, utxos_6_output);
-        let signature_6 = wallet_5.1.sign_transaction(&transaction_info_6).unwrap();
+        let signature_6 =
+            wallet_5.1.sign_transaction(&transaction_info_6).unwrap();
         let transaction_6 = Transaction::new(
             wallet_5.0.clone(),
             wallet_1.0.clone(),

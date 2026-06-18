@@ -130,7 +130,9 @@ impl Transaction {
         serde_json::to_string_pretty(self).unwrap()
     }
 
-    pub fn check_transaction(tx: &Transaction) -> Result<(), TransactionDeserializeError> {
+    pub fn check_transaction(
+        tx: &Transaction,
+    ) -> Result<(), TransactionDeserializeError> {
         let input_sum = UTXO::sum(&tx.transaction_info.inputs);
         println!("Input sum is {input_sum}");
         let output_sum = UTXO::sum(&tx.transaction_info.outputs);

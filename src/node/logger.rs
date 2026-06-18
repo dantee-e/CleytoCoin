@@ -101,7 +101,9 @@ impl Logger {
         std::fs::write(path, contents)?;
         Ok(())
     }
-    pub fn read_logs_file(path: &std::path::PathBuf) -> std::result::Result<Logger, LoggerError> {
+    pub fn read_logs_file(
+        path: &std::path::PathBuf,
+    ) -> std::result::Result<Logger, LoggerError> {
         println!("config log path is {}", path.to_str().unwrap());
         let contents = std::fs::read_to_string(path)?;
         let logs = contents.split("\n").map(|str| str.to_string()).collect();

@@ -1,6 +1,8 @@
 use crate::node::logger::Logger;
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+};
 use ratatui::{
     prelude::*,
     style::Stylize,
@@ -42,7 +44,10 @@ impl App {
     fn render(&mut self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints(vec![
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
             .split(frame.area());
 
         let main_title = Line::from(" CleytoCoin node is running! ")
@@ -83,7 +88,9 @@ impl App {
     fn handle_crossterm_events(&mut self) -> Result<()> {
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
-                Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key),
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    self.on_key_event(key)
+                }
                 Event::Mouse(_) => {}
                 Event::Resize(_, _) => {}
                 _ => {}
@@ -95,7 +102,10 @@ impl App {
     fn on_key_event(&mut self, key: KeyEvent) {
         match (key.modifiers, key.code) {
             (_, KeyCode::Esc | KeyCode::Char('q'))
-            | (KeyModifiers::CONTROL, KeyCode::Char('c') | KeyCode::Char('C')) => self.quit(),
+            | (
+                KeyModifiers::CONTROL,
+                KeyCode::Char('c') | KeyCode::Char('C'),
+            ) => self.quit(),
             // Add other key handlers here.
             _ => {}
         }

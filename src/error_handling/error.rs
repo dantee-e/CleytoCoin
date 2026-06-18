@@ -9,13 +9,21 @@ pub enum CleytonError {
     TransactionDeserializeError(TransactionDeserializeError),
     BlockSerializationError(serde_json::Error),
     BlockDeserializationError(serde_json::Error),
+    GenericSerdeError(serde_json::Error),
     BlockNotFound,
     ReadWriteError(io::Error),
     LastBlockLessThanZero,
+    SendMessageError(String),
 }
 
 impl From<io::Error> for CleytonError {
     fn from(value: io::Error) -> Self {
         CleytonError::ReadWriteError(value)
+    }
+}
+
+impl From<serde_json::Error> for CleytonError {
+    fn from(value: serde_json::Error) -> Self {
+        CleytonError::GenericSerdeError(value)
     }
 }

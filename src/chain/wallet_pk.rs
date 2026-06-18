@@ -16,12 +16,16 @@ impl WalletPK {
         &self,
         transaction_info: &TransactionInfo,
     ) -> Result<Vec<u8>, ErrorStack> {
-        let mut signer = Signer::new(MessageDigest::sha256(), &self.private_key)?;
+        let mut signer =
+            Signer::new(MessageDigest::sha256(), &self.private_key)?;
         signer.sign_oneshot_to_vec(transaction_info.to_string().as_bytes())
     }
     pub fn to_pem_with_password(&self, password: &String) -> Vec<u8> {
         self.private_key
-            .private_key_to_pem_pkcs8_passphrase(Cipher::aes_256_cbc(), password.as_bytes())
+            .private_key_to_pem_pkcs8_passphrase(
+                Cipher::aes_256_cbc(),
+                password.as_bytes(),
+            )
             .unwrap()
     }
     pub fn to_pem(&self) -> Vec<u8> {

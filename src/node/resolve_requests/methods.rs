@@ -132,7 +132,10 @@ impl HTTPRequest {
         &self.method
     }
 
-    fn make_response(status: HTTPResponse, accept: Option<&str>) -> std::io::Result<Response> {
+    fn make_response(
+        status: HTTPResponse,
+        accept: Option<&str>,
+    ) -> std::io::Result<Response> {
         fn response_ok_content(content: Content) -> std::io::Result<Response> {
             match content {
                 Content::HTML(path) => Ok(Response {
@@ -209,7 +212,8 @@ impl HTTPRequest {
                     Ok(Response::new(
                         400,
                         "text/html",
-                        fs::read("static/400.html").unwrap_or_else(|_| b"400 Bad Request".to_vec()),
+                        fs::read("static/400.html")
+                            .unwrap_or_else(|_| b"400 Bad Request".to_vec()),
                     ))
                 } else {
                     Ok(Response::new(
@@ -224,8 +228,9 @@ impl HTTPRequest {
                     Ok(Response::new(
                         500,
                         "text/html",
-                        fs::read("static/500.html")
-                            .unwrap_or_else(|_| b"500 Internal Server Error".to_vec()),
+                        fs::read("static/500.html").unwrap_or_else(|_| {
+                            b"500 Internal Server Error".to_vec()
+                        }),
                     ))
                 } else {
                     Ok(Response::new(
@@ -257,7 +262,9 @@ impl HTTPRequest {
     pub fn response(&mut self, status: HTTPResponse) {
         let accept = self.headers.get("Accept").map(|s| s.as_str());
         let resp = Self::make_response(status, accept).unwrap();
-        if let Err(e) = self.stream.as_mut().unwrap().write_all(&resp.to_bytes()) {
+        if let Err(e) =
+            self.stream.as_mut().unwrap().write_all(&resp.to_bytes())
+        {
             eprintln!("Error writing response to stream: {}", e);
         }
     }
@@ -303,9 +310,13 @@ pub enum HTTPParseError {
 impl fmt::Display for HTTPParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            HTTPParseError::InvalidRequestLine => write!(f, "Invalid request line"),
+            HTTPParseError::InvalidRequestLine => {
+                write!(f, "Invalid request line")
+            }
             // HTTPParseError::MissingFields => write!(f, "Missing required fields"),
-            HTTPParseError::InvalidStatusLine => write!(f, "Invalid status line"),
+            HTTPParseError::InvalidStatusLine => {
+                write!(f, "Invalid status line")
+            }
             HTTPParseError::MissingContentLength => {
                 write!(f, "Missing content-length field in headers")
             }

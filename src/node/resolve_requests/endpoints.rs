@@ -1,15 +1,17 @@
 use super::super::LOG_LEVEL;
 use super::errors::HTTPResponseError;
 use super::helpers::{
-    method_not_allowed, path_not_found, return_html, return_image, return_json, GETFunc,
-    HTTPResult, Handler, POSTFunc,
+    method_not_allowed, path_not_found, return_html, return_image, return_json,
+    GETFunc, HTTPResult, Handler, POSTFunc,
 };
 use super::messages::process::{
-    check_block_by_block_header, check_transaction_by_transaction_header, process_get_data_block,
-    process_get_data_transaction, process_new_block,
+    check_block_by_block_header, check_transaction_by_transaction_header,
+    process_get_data_block, process_get_data_transaction, process_new_block,
 };
 use super::messages::{GetDataMessage, Message};
-use super::methods::{Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData};
+use super::methods::{
+    Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData,
+};
 use crate::chain::transaction::Transaction;
 use crate::error_handling::{TransactionDeserializeError, TransactionError};
 use crate::node::resolve_requests::messages::process::process_new_node;
@@ -30,7 +32,10 @@ pub fn index(_: &GETData, _: Arc<Mutex<NodeState>>) -> HTTPResult {
 
 // pub fn send_message(message: Message) -> CleytoResult<()> {}
 
-pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+pub fn submit_transaction(
+    data: &POSTData,
+    state: Arc<Mutex<NodeState>>,
+) -> HTTPResult {
     // Deserializes the transactoibn
     let body = data.body.clone().unwrap();
     let transaction: Transaction = match serde_json::from_str(&body) {
@@ -86,8 +91,12 @@ pub fn submit_transaction(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTP
     })))))
 }
 
-pub fn get_transaction_pool(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
-    let transaction_pool: Vec<Transaction> = state.lock().unwrap().transactions_pool.clone();
+pub fn get_transaction_pool(
+    _: &GETData,
+    state: Arc<Mutex<NodeState>>,
+) -> HTTPResult {
+    let transaction_pool: Vec<Transaction> =
+        state.lock().unwrap().transactions_pool.clone();
     let response = serde_json::to_value(transaction_pool).unwrap();
     Ok(HTTPResponse::OK(Some(Content::JSON(response))))
 }
@@ -99,7 +108,9 @@ pub fn favicon(_: &GETData, _: Arc<Mutex<NodeState>>) -> HTTPResult {
 pub fn status(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
     let state = match state.lock() {
         Ok(guard) => guard,
-        Err(_) => panic!("Mutex lock was poisoned in function status on endpoints"),
+        Err(_) => {
+            panic!("Mutex lock was poisoned in function status on endpoints")
+        }
     };
 
     return_json(json!({
@@ -112,8 +123,8 @@ pub fn status(_: &GETData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
 
 pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
     let body = data.body.clone().unwrap();
-    let message: Message =
-        serde_json::from_str(&body).map_err(|_| HTTPResponseError::InvalidBody(None))?;
+    let message: Message = serde_json::from_str(&body)
+        .map_err(|_| HTTPResponseError::InvalidBody(None))?;
 
     match message {
         Message::CheckBlock(block_header) => {
@@ -131,7 +142,10 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
         Message::KeyRefresh => todo!(),
         Message::CheckTransaction(transaction_header) => {
             let transaction_pool = &state.lock().unwrap().transactions_pool;
-            check_transaction_by_transaction_header(transaction_header, transaction_pool)
+            check_transaction_by_transaction_header(
+                transaction_header,
+                transaction_pool,
+            )
         }
         Message::GetData(get_data_message) => match get_data_message {
             GetDataMessage::Block(block_header) => {
@@ -140,7 +154,10 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
             }
             GetDataMessage::Transaction(transaction_header) => {
                 let transaction_pool = &state.lock().unwrap().transactions_pool;
-                process_get_data_transaction(transaction_header, transaction_pool)
+                process_get_data_transaction(
+                    transaction_header,
+                    transaction_pool,
+                )
             }
         },
     }
@@ -161,7 +178,8 @@ pub fn resolve_endpoint(
         endpoints: &'b mut HashMap<&'a str, HashMap<&'a str, Box<dyn Handler>>>,
     ) -> impl FnMut(&'a str, Option<GETFunc>, Option<POSTFunc>) + 'b {
         |path: &'a str, get: Option<GETFunc>, post: Option<POSTFunc>| {
-            let mut methods: HashMap<&'a str, Box<dyn Handler>> = HashMap::new();
+            let mut methods: HashMap<&'a str, Box<dyn Handler>> =
+                HashMap::new();
             if let Some(get) = get {
                 methods.insert("GET", Box::new(get) as Box<dyn Handler>);
             }
@@ -172,15 +190,25 @@ pub fn resolve_endpoint(
             endpoints.insert(path, methods);
         }
     }
-    fn initialize_endpoints<'a>() -> HashMap<&'a str, HashMap<&'a str, Box<dyn Handler>>> {
-        let mut endpoints: HashMap<&str, HashMap<&str, Box<dyn Handler>>> = HashMap::new();
+    fn initialize_endpoints<'a>(
+    ) -> HashMap<&'a str, HashMap<&'a str, Box<dyn Handler>>> {
+        let mut endpoints: HashMap<&str, HashMap<&str, Box<dyn Handler>>> =
+            HashMap::new();
         {
             let mut add_endpoints = curry_add_endpoint(&mut endpoints);
             add_endpoints("/", Some(index), None);
             add_endpoints("/favicon.ico", Some(favicon), None);
             add_endpoints("/status", Some(status), None);
-            add_endpoints("/submit-transaction", None, Some(submit_transaction));
-            add_endpoints("/get-transaction-pool", Some(get_transaction_pool), None);
+            add_endpoints(
+                "/submit-transaction",
+                None,
+                Some(submit_transaction),
+            );
+            add_endpoints(
+                "/get-transaction-pool",
+                Some(get_transaction_pool),
+                None,
+            );
             add_endpoints("/messages", None, Some(messages));
         }
         endpoints

@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use cleyto_coin::{generate, kill_node, new_server_name, run_server_thread, send};
+use cleyto_coin::{
+    generate, kill_node, new_server_name, run_server_thread, send,
+};
 
 const SENDER_PUBLIC_KEY_PATH: &str = "./wallets/sender/public.pem";
 const SENDER_PRIVATE_KEY_PATH: &str = "./wallets/sender/private.pem";

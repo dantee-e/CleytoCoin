@@ -21,15 +21,18 @@ pub fn check_transaction_by_transaction_header(
     {
         Ok(HTTPResponse::OK(None))
     } else {
-        let value = serde_json::to_value(Message::GetData(GetDataMessage::Transaction(
-            transaction_header,
-        )))
+        let value = serde_json::to_value(Message::GetData(
+            GetDataMessage::Transaction(transaction_header),
+        ))
         .unwrap();
         Ok(HTTPResponse::OK(Some(Content::JSON(value))))
     }
 }
 
-pub fn check_block_by_block_header(block_header: BlockHeader, chain: &Chain) -> HTTPResult {
+pub fn check_block_by_block_header(
+    block_header: BlockHeader,
+    chain: &Chain,
+) -> HTTPResult {
     if chain
         .blocks
         .iter()
@@ -37,8 +40,10 @@ pub fn check_block_by_block_header(block_header: BlockHeader, chain: &Chain) -> 
     {
         Ok(HTTPResponse::OK(None))
     } else {
-        let value =
-            serde_json::to_value(Message::GetData(GetDataMessage::Block(block_header))).unwrap();
+        let value = serde_json::to_value(Message::GetData(
+            GetDataMessage::Block(block_header),
+        ))
+        .unwrap();
         Ok(HTTPResponse::OK(Some(Content::JSON(value))))
     }
 }

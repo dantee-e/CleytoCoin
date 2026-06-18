@@ -18,6 +18,7 @@ use resolve_requests::methods::{HTTPParseError, HTTPRequest};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{self};
+use std::net::SocketAddr;
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -33,7 +34,7 @@ use thread_pool::custom_thread_pool::ThreadPool;
 #[derive(Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub struct ConnectedNodeInfo {
     pub public_key: Vec<u8>,
-    pub address: String,
+    pub address: SocketAddr,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -52,8 +53,9 @@ struct NodeConfig {
 }
 impl Default for NodeConfig {
     fn default() -> Self {
-        let proj_dirs = ProjectDirs::from("", "CleytoCoin Big Mean Corp", "cleyto_coin")
-            .expect("Could not find the config directory");
+        let proj_dirs =
+            ProjectDirs::from("", "CleytoCoin Big Mean Corp", "cleyto_coin")
+                .expect("Could not find the config directory");
         Self {
             log_path: proj_dirs.data_dir().join("logs.log"),
         }
@@ -87,18 +89,21 @@ static NUMBER_OF_THREADS_IN_THREAD_POOL: Lazy<usize> = Lazy::new(num_cpus::get);
 pub const LOG_LEVEL: u8 = 2;
 
 fn load_config() -> NodeConfig {
-    let proj_dirs = ProjectDirs::from("", "CleytoCoin Big Mean Corp", "cleyto_coin")
-        .expect("Could not find the config directory");
+    let proj_dirs =
+        ProjectDirs::from("", "CleytoCoin Big Mean Corp", "cleyto_coin")
+            .expect("Could not find the config directory");
     let config_path = proj_dirs.config_dir().join("config.toml");
 
     if let Ok(contents) = fs::read_to_string(&config_path) {
         toml::from_str(&contents).expect("Invalid config format")
     } else {
-        fs::create_dir_all(proj_dirs.config_dir()).expect("Could not create config directories");
+        fs::create_dir_all(proj_dirs.config_dir())
+            .expect("Could not create config directories");
 
         let default_cfg = NodeConfig::default();
         let toml_str = toml::to_string_pretty(&default_cfg).unwrap();
-        fs::write(&config_path, &toml_str).expect("Couldn't write default config");
+        fs::write(&config_path, &toml_str)
+            .expect("Couldn't write default config");
         default_cfg
     }
 }
@@ -110,11 +115,16 @@ impl Node {
 
     pub fn new(chain: Chain, name: String) -> (Node, Arc<Logger>) {
         let config = load_config();
-        let logger =
-            Arc::new(Logger::read_logs_file(&config.log_path).unwrap_or_else(|_| Logger::new()));
+        let logger = Arc::new(
+            Logger::read_logs_file(&config.log_path)
+                .unwrap_or_else(|_| Logger::new()),
+        );
         let logger_clone = Arc::clone(&logger);
-        let socket_location =
-            PathBuf::from(format!("{}/{}.sock:", ConfigPaths::get().sockets_dir, name));
+        let socket_location = PathBuf::from(format!(
+            "{}/{}.sock:",
+            ConfigPaths::get().sockets_dir,
+            name
+        ));
 
         println!(
             "Creating node with name {name} and socket {}",
@@ -185,7 +195,8 @@ impl Node {
             }
 
             if let Some((key, value)) = line.split_once(":") {
-                http_headers.insert(key.trim().to_string(), value.trim().to_string());
+                http_headers
+                    .insert(key.trim().to_string(), value.trim().to_string());
             } else {
                 return Err(HTTPParseError::InvalidRequestLine);
             };
@@ -223,7 +234,8 @@ impl Node {
             return Err(HTTPParseError::InvalidRequestLine);
         }
 
-        let http_body: Option<String> = Some(String::from_utf8_lossy(&body).to_string());
+        let http_body: Option<String> =
+            Some(String::from_utf8_lossy(&body).to_string());
 
         if method == "POST" {
             return Ok(HTTPRequest::new(
@@ -245,12 +257,15 @@ impl Node {
     ) -> Result<Option<String>, Option<String>> {
         let buf_reader = BufReader::new(&stream);
 
-        let mut request_object: HTTPRequest = match Self::parse_http_request(buf_reader) {
-            Ok(value) => value,
-            Err(e) => {
-                return Err(Some(format!("Error processing HTTP request: {e}")));
-            }
-        };
+        let mut request_object: HTTPRequest =
+            match Self::parse_http_request(buf_reader) {
+                Ok(value) => value,
+                Err(e) => {
+                    return Err(Some(format!(
+                        "Error processing HTTP request: {e}"
+                    )));
+                }
+            };
 
         request_object.set_stream(stream);
 
@@ -264,7 +279,10 @@ impl Node {
             match selected_port {
                 port if (1..=65535).contains(&port) => port,
                 _ => {
-                    println!("Invalid port! Using default: {}", Self::DEFAULT_PORT);
+                    println!(
+                        "Invalid port! Using default: {}",
+                        Self::DEFAULT_PORT
+                    );
                     Self::DEFAULT_PORT
                 }
             }
@@ -272,7 +290,8 @@ impl Node {
 
         println!("Running node of name {}", self.name);
 
-        let tcp_listener = match TcpListener::bind(format!("127.0.0.1:{port}")) {
+        let tcp_listener = match TcpListener::bind(format!("127.0.0.1:{port}"))
+        {
             Ok(l) => l,
             Err(_) => panic!("Trying to create another node in the same port"),
         };
@@ -281,19 +300,21 @@ impl Node {
             .set_nonblocking(true)
             .expect("Cannot set non-blocking");
 
-        let thread_pool = match ThreadPool::new(*NUMBER_OF_THREADS_IN_THREAD_POOL) {
-            Ok(value) => value,
-            Err(e) => panic!("{e}"),
-        };
+        let thread_pool =
+            match ThreadPool::new(*NUMBER_OF_THREADS_IN_THREAD_POOL) {
+                Ok(value) => value,
+                Err(e) => panic!("{e}"),
+            };
 
         // The termination signal will come from a socket
         let parent = self.socket_location.parent().unwrap();
-        std::fs::create_dir_all(parent).expect("Could not create dirs for parent socket");
+        std::fs::create_dir_all(parent)
+            .expect("Could not create dirs for parent socket");
 
         let mut read_buffer: [u8; 100] = [0u8; 100];
 
-        let unix_listener =
-            UnixListener::bind(self.socket_location.clone()).expect("Could not bind to socket");
+        let unix_listener = UnixListener::bind(self.socket_location.clone())
+            .expect("Could not bind to socket");
         unix_listener
             .set_nonblocking(true)
             .expect("Could not set non-blocking");
@@ -304,10 +325,11 @@ impl Node {
 
         loop {
             if let Ok((mut listener, _)) = unix_listener.accept() {
-                let command: Option<&str> = match listener.read(&mut read_buffer) {
-                    Ok(n) => str::from_utf8(&read_buffer[..n]).ok(),
-                    Err(_) => None,
-                };
+                let command: Option<&str> =
+                    match listener.read(&mut read_buffer) {
+                        Ok(n) => str::from_utf8(&read_buffer[..n]).ok(),
+                        Err(_) => None,
+                    };
 
                 match command {
                     Some("kill") => {
@@ -335,7 +357,9 @@ impl Node {
                     })
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(Self::REFRESH_RATE_SERVER_IN_MS));
+                    thread::sleep(Duration::from_millis(
+                        Self::REFRESH_RATE_SERVER_IN_MS,
+                    ));
                 }
                 Err(e) => {
                     eprintln!("Error accepting connection: {}", e);

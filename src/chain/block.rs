@@ -102,7 +102,8 @@ impl Block {
                 let mut hasher = Hasher::new(MessageDigest::sha256()).unwrap();
                 hasher.update(hash_1).unwrap();
                 hasher.update(hash_2).unwrap();
-                hash_vec[i / 2] = hasher.finish().unwrap().as_ref().try_into().unwrap();
+                hash_vec[i / 2] =
+                    hasher.finish().unwrap().as_ref().try_into().unwrap();
             }
             closest_pow_2 /= 2;
         }

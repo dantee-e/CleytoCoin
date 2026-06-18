@@ -1,4 +1,6 @@
-use super::methods::{Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData};
+use super::methods::{
+    Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData,
+};
 use crate::node::resolve_requests::errors::HTTPResponseError;
 use crate::node::NodeState;
 use std::path::PathBuf;
@@ -30,12 +32,20 @@ pub fn method_not_allowed(s: Option<&str>) -> HTTPResult {
 }
 
 pub trait Handler {
-    fn call(&self, request: &HTTPRequest, state: Arc<Mutex<NodeState>>) -> HTTPResult;
+    fn call(
+        &self,
+        request: &HTTPRequest,
+        state: Arc<Mutex<NodeState>>,
+    ) -> HTTPResult;
 }
 
 // Implement the trait for GETFunc
 impl Handler for GETFunc {
-    fn call(&self, request: &HTTPRequest, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+    fn call(
+        &self,
+        request: &HTTPRequest,
+        state: Arc<Mutex<NodeState>>,
+    ) -> HTTPResult {
         match request.get_method() {
             Method::GET(data) => self(data, state),
             _ => method_not_allowed(None),
@@ -45,7 +55,11 @@ impl Handler for GETFunc {
 
 // Implement the trait for POSTFunc
 impl Handler for POSTFunc {
-    fn call(&self, request: &HTTPRequest, state: Arc<Mutex<NodeState>>) -> HTTPResult {
+    fn call(
+        &self,
+        request: &HTTPRequest,
+        state: Arc<Mutex<NodeState>>,
+    ) -> HTTPResult {
         match request.get_method() {
             Method::POST(data) => self(data, state),
             _ => method_not_allowed(None),

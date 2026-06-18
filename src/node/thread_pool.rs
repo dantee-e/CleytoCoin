@@ -18,7 +18,11 @@ pub mod custom_thread_pool {
                     write!(f, "You must use at least one thread on the pool")
                 }
                 PoolCreationError::TooManyThreads => {
-                    write!(f, "You must use less than {} threads on the pool", u32::MAX)
+                    write!(
+                        f,
+                        "You must use less than {} threads on the pool",
+                        u32::MAX
+                    )
                 }
             }
         }
@@ -31,7 +35,10 @@ pub mod custom_thread_pool {
     }
 
     impl Worker {
-        pub fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+        pub fn new(
+            id: usize,
+            receiver: Arc<Mutex<mpsc::Receiver<Job>>>,
+        ) -> Worker {
             let thread = thread::spawn(move || loop {
                 let message = receiver.lock().unwrap().recv();
 

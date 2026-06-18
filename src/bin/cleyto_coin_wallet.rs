@@ -23,7 +23,10 @@ enum Args {
     /// Send a transaction
     Send {
         /// Recipient’s public key as a string
-        #[structopt(long = "recipient-key", required_unless = "recipient-key-file")]
+        #[structopt(
+            long = "recipient-key",
+            required_unless = "recipient-key-file"
+        )]
         recipient_key: Option<String>,
 
         /// Recipient’s public key from a file
@@ -35,7 +38,11 @@ enum Args {
         recipient_key_file: Option<PathBuf>,
 
         /// Sender’s private key as a string
-        #[structopt(long = "sender-key", short = "sk", required_unless = "sender-key-file")]
+        #[structopt(
+            long = "sender-key",
+            short = "sk",
+            required_unless = "sender-key-file"
+        )]
         sender_key: Option<String>,
 
         /// Sender’s private key from a file
@@ -84,7 +91,9 @@ async fn main() {
             .await
             {
                 Ok(_) => {}
-                Err(e) => println!("Error {e} when sending transaction to server"),
+                Err(e) => {
+                    println!("Error {e} when sending transaction to server")
+                }
             }
         }
     }
