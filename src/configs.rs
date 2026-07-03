@@ -34,8 +34,11 @@ impl Config {
     pub fn get() -> Self {
         let last_block_path = PathBuf::from(ConfigPaths::get().last_block);
         let last_block = match std::fs::read_to_string(&last_block_path) {
-            Ok(v) => str::parse::<u32>(&v)
-                .expect("Last block file has non uinteger value"),
+            Ok(v) => {
+                println!("v is {v}");
+                str::parse::<u32>(&v)
+                    .expect("Last block file has non uinteger value")
+            }
             Err(_) => {
                 std::fs::create_dir_all(last_block_path.parent().unwrap())
                     .expect("Could not create dir .cleyto_coin");

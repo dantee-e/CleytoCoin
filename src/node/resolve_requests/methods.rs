@@ -1,9 +1,11 @@
 use serde_json::json;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::io::prelude::*;
-use std::net::TcpStream;
 use std::path::PathBuf;
 use std::{fmt, fs};
+
+use crate::node::Stream;
 
 #[allow(clippy::upper_case_acronyms)]
 pub enum ImageType {
@@ -97,7 +99,7 @@ impl Response {
 
 #[derive(Debug)]
 pub struct HTTPRequest {
-    stream: Option<TcpStream>,
+    stream: Option<Box<dyn Stream>>,
     pub headers: HashMap<String, String>,
     method: Method,
     http_version: String,
@@ -105,7 +107,7 @@ pub struct HTTPRequest {
 
 impl HTTPRequest {
     pub fn new(
-        stream: Option<TcpStream>,
+        stream: Option<Box<dyn Stream>>,
         method: String,
         path: PathBuf,
         http_version: String,
@@ -124,7 +126,7 @@ impl HTTPRequest {
         }
     }
 
-    pub fn set_stream(&mut self, stream: TcpStream) {
+    pub fn set_stream(&mut self, stream: Box<dyn Stream>) {
         self.stream = Some(stream)
     }
 

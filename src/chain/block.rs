@@ -55,6 +55,9 @@ impl Block {
     /// leaves for a binary tree, and then it collapses the tree into the root, which is then
     /// returned.
     fn calculate_merkle_root(transactions: &[Transaction]) -> [u8; 32] {
+        if transactions.is_empty() {
+            return [0; 32];
+        }
         // This gets the closest bigger power of 2
         let log_2 = f32::log2(transactions.len() as f32);
         let mut closest_log_2: u32 = log_2 as u32;

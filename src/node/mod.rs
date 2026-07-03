@@ -3,6 +3,7 @@ pub mod logger;
 pub mod ui;
 
 mod resolve_requests;
+mod stream;
 mod thread_pool;
 mod utils;
 
@@ -24,11 +25,12 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{
     collections::HashMap,
-    io::{prelude::*, BufReader},
-    net::{TcpListener, TcpStream},
+    io::{prelude::*, BufReader, Read},
+    net::TcpListener,
     sync::{Arc, Mutex},
     thread,
 };
+pub use stream::Stream;
 use thread_pool::custom_thread_pool::ThreadPool;
 
 #[derive(Serialize, Deserialize, PartialEq, Hash, Eq, Clone)]
@@ -47,6 +49,17 @@ pub struct NodeState {
     */
     connected_nodes: HashSet<ConnectedNodeInfo>, // very naive way to do it, I'll just store the public keys
 }
+impl Default for NodeState {
+    fn default() -> Self {
+        NodeState {
+            status: true,
+            chain: Chain::new(),
+            transactions_pool: Vec::new(),
+            connected_nodes: HashSet::new(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct NodeConfig {
     log_path: PathBuf,
@@ -148,7 +161,7 @@ impl Node {
     }
 
     fn parse_http_request<R: Read>(
-        mut buf_reader: BufReader<R>,
+        buf_reader: &mut BufReader<R>,
     ) -> Result<HTTPRequest, HTTPParseError> {
         let mut http_headers: HashMap<String, String> = HashMap::new();
 
@@ -251,14 +264,14 @@ impl Node {
         Err(HTTPParseError::InvalidStatusLine)
     }
 
-    fn handle_connection(
+    pub fn handle_connection(
         state: Arc<Mutex<NodeState>>,
-        stream: TcpStream,
+        stream: Box<dyn Stream>,
     ) -> Result<Option<String>, Option<String>> {
-        let buf_reader = BufReader::new(&stream);
+        let mut buf_reader = BufReader::new(stream);
 
         let mut request_object: HTTPRequest =
-            match Self::parse_http_request(buf_reader) {
+            match Self::parse_http_request(&mut buf_reader) {
                 Ok(value) => value,
                 Err(e) => {
                     return Err(Some(format!(
@@ -267,6 +280,7 @@ impl Node {
                 }
             };
 
+        let stream = buf_reader.into_inner();
         request_object.set_stream(stream);
 
         resolve_endpoint(state, request_object)
@@ -347,7 +361,7 @@ impl Node {
                     let logger = Arc::clone(&self.logger);
                     let state = Arc::clone(&self.state);
                     thread_pool.execute(move || {
-                        match Self::handle_connection(state, stream) {
+                        match Self::handle_connection(state, Box::new(stream)) {
                             Ok(Some(value)) => {
                                 logger.log(value);
                             }
