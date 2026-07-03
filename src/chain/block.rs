@@ -67,11 +67,12 @@ impl Block {
         let mut hash_vec = (0..closest_pow_2)
             .map(|i| {
                 let transaction_hash = {
-                    let transaction = match transactions.get(i) {
+                    // If index is over the size of transactions, gets last transactions txid instead
+                    match transactions.get(i) {
                         Some(transaction) => transaction,
                         None => transactions.last().unwrap(),
-                    };
-                    transaction.txid
+                    }
+                    .txid
                 };
                 transaction_hash
             })

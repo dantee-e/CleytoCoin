@@ -59,7 +59,13 @@ pub struct Transaction {
     pub receiver: Wallet,
     pub signature: Vec<u8>,
     pub transaction_info: TransactionInfo,
-    pub txid: [u8; 32],
+    pub txid: [u8; 32], // hash
+}
+
+impl PartialEq for Transaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.txid == other.txid
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]

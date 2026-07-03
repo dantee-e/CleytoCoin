@@ -31,7 +31,7 @@ use std::{
 };
 use thread_pool::custom_thread_pool::ThreadPool;
 
-#[derive(Serialize, Deserialize, PartialEq, Hash, Eq)]
+#[derive(Serialize, Deserialize, PartialEq, Hash, Eq, Clone)]
 pub struct ConnectedNodeInfo {
     pub public_key: Vec<u8>,
     pub address: SocketAddr,

@@ -14,7 +14,9 @@ use super::methods::{
 };
 use crate::chain::transaction::Transaction;
 use crate::error_handling::{TransactionDeserializeError, TransactionError};
-use crate::node::resolve_requests::messages::process::process_new_node;
+use crate::node::resolve_requests::messages::process::{
+    process_new_node, process_new_transaction,
+};
 use crate::node::NodeState;
 
 use chrono::Utc;
@@ -133,7 +135,9 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
         }
         Message::Block(block) => {
             let chain = &mut state.lock().unwrap().chain;
-            process_new_block(block, chain)
+            let connected_nodes = &state.lock().unwrap().connected_nodes;
+            // TODO eventually add the source
+            process_new_block(block, chain, connected_nodes, None)
         }
         Message::NewNode(new_node_message) => {
             let connected_nodes = &mut state.lock().unwrap().connected_nodes;
@@ -160,6 +164,17 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
                 )
             }
         },
+        Message::Transaction(transaction) => {
+            let transaction_pool = &mut state.lock().unwrap().transactions_pool;
+            let connected_nodes = &state.lock().unwrap().connected_nodes;
+            // TODO eventually add the source
+            process_new_transaction(
+                transaction,
+                transaction_pool,
+                connected_nodes,
+                None,
+            )
+        }
     }
 }
 

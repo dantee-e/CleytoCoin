@@ -1,62 +1,28 @@
-use std::{
-    collections::HashSet,
-    io::Write,
-    net::{SocketAddr, TcpStream},
-};
+use std::{collections::HashSet, io::Write, net::TcpStream};
 
 use crate::{
-    chain::{
-        block::{Block, BlockHeader},
-        transaction::{Transaction, TransactionHeader},
-        Chain,
-    },
+    chain::{block::Block, transaction::Transaction},
     error_handling::{CleytoResult, CleytonError},
-    node::{
-        resolve_requests::{
-            helpers::HTTPResult,
-            messages::{message_struct::GetDataMessage, Message},
-            methods::{Content, HTTPResponse},
-        },
-        ConnectedNodeInfo,
-    },
+    node::{resolve_requests::messages::Message, ConnectedNodeInfo},
 };
 
-// TODO maybe these two could avoid sending messages back to wherever they came from in the first place
-pub fn notify_new_transaction(
-    transaction: Transaction,
-    connected_nodes: HashSet<ConnectedNodeInfo>,
+fn send_message(
+    message: Message,
+    connected_nodes: &HashSet<ConnectedNodeInfo>,
+    source: Option<&[u8]>,
 ) -> Vec<CleytoResult<()>> {
-    let header = transaction.to_header();
-
-    let message = Message::CheckTransaction(header);
+    let source_pkey = if let Some(pkey) = source {
+        pkey
+    } else {
+        &vec![]
+    };
 
     connected_nodes
         .iter()
         .map(|node| {
-            let mut stream = TcpStream::connect(node.address).unwrap();
-            if let Err(e) = stream
-                .write_all(serde_json::to_string(&message).unwrap().as_bytes())
-            {
-                Err(CleytonError::SendMessageError(e.to_string()))
-            } else {
-                Ok(())
+            if node.public_key == source_pkey {
+                return Ok(());
             }
-        })
-        .collect()
-}
-
-// TODO maybe these two could avoid sending messages back to wherever they came from in the first place
-pub fn notify_new_block(
-    block: Block,
-    connected_nodes: HashSet<ConnectedNodeInfo>,
-) -> Vec<CleytoResult<()>> {
-    let header = block.to_header();
-
-    let message = Message::CheckBlock(header);
-
-    connected_nodes
-        .iter()
-        .map(|node| {
             let mut stream = TcpStream::connect(node.address).unwrap();
             if let Err(e) =
                 stream.write_all(serde_json::to_string(&message)?.as_bytes())
@@ -67,4 +33,40 @@ pub fn notify_new_block(
             }
         })
         .collect()
+}
+
+/// source is public key of message sender
+pub fn notify_new_transaction(
+    transaction: &Transaction,
+    connected_nodes: &HashSet<ConnectedNodeInfo>,
+    source: Option<&[u8]>,
+) -> Vec<CleytoResult<()>> {
+    let header = transaction.to_header();
+
+    let message = Message::CheckTransaction(header);
+
+    send_message(message, connected_nodes, source)
+}
+
+/// source is public key of message sender
+pub fn notify_new_block(
+    block: &Block,
+    connected_nodes: &HashSet<ConnectedNodeInfo>,
+    source: Option<&[u8]>,
+) -> Vec<CleytoResult<()>> {
+    let header = block.to_header();
+
+    let message = Message::CheckBlock(header);
+
+    send_message(message, connected_nodes, source)
+}
+
+pub fn notify_new_node(
+    node: &ConnectedNodeInfo,
+    connected_nodes: &HashSet<ConnectedNodeInfo>,
+    source: Option<&[u8]>,
+) -> Vec<CleytoResult<()>> {
+    let message = Message::NewNode(node.clone());
+
+    send_message(message, connected_nodes, source)
 }

@@ -3,7 +3,10 @@ use std::collections::HashSet;
 use openssl::pkey::PKey;
 
 use crate::node::{
-    resolve_requests::{helpers::HTTPResult, methods::HTTPResponse},
+    resolve_requests::{
+        helpers::HTTPResult, messages::send::notify_new_node,
+        methods::HTTPResponse,
+    },
     ConnectedNodeInfo,
 };
 
@@ -15,6 +18,7 @@ pub fn process_new_node(
     let _ = PKey::public_key_from_pem(&new_node_message.public_key)?;
 
     if !connected_nodes.contains(&new_node_message) {
+        notify_new_node(&new_node_message, connected_nodes, None);
         connected_nodes.insert(new_node_message);
     }
 
