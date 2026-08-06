@@ -7,6 +7,8 @@ mod stream;
 mod thread_pool;
 mod utils;
 
+pub use resolve_requests::messages::{GetDataMessage, Message};
+
 use crate::chain::{transaction::Transaction, Chain};
 use crate::configs::ConfigPaths;
 use crate::node::logger::Logger;

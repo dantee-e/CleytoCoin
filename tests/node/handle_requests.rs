@@ -92,8 +92,10 @@ mod handle_connection_tests {
     #[tokio::test]
     async fn test_post_messages_success() {
         // TODO: replace with real message payload shape if not this simple.
-        let body = r#"{"content":"hello"}"#;
-        let result = request("POST", "/messages", Some(body)).await;
+        let body =
+            serde_json::to_string(&cleyto_coin::node::Message::KeyRefresh)
+                .unwrap();
+        let result = request("POST", "/messages", Some(&body)).await;
         assert!(result.is_ok(), "expected Ok, got {:?}", result);
     }
 
