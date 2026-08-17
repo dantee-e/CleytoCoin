@@ -38,7 +38,9 @@ pub async fn send_data(
 ) -> Result<Option<String>, Option<String>> {
     let state = Arc::new(Mutex::new(state));
 
-    let mut contents = vec![0u8; 1024];
+    let input_bytes_size = input_bytes.len();
+
+    let mut contents = vec![0u8; input_bytes_size];
     contents[..input_bytes.len()].clone_from_slice(input_bytes);
     let stream = MockStream {
         read_data: contents,

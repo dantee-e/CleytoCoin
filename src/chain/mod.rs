@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::chain::block::BlockHeader;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Chain {
     pub blocks: Vec<block::Block>,
 }
