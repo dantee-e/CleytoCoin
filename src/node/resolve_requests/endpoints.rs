@@ -13,7 +13,6 @@ use super::methods::{
     Content, GETData, HTTPRequest, HTTPResponse, ImageType, Method, POSTData,
 };
 use crate::chain::transaction::Transaction;
-use crate::error_handling::{TransactionDeserializeError, TransactionError};
 use crate::node::resolve_requests::messages::process::{
     process_new_node, process_new_transaction,
 };
@@ -33,65 +32,6 @@ pub fn index(_: &GETData, _: Arc<Mutex<NodeState>>) -> HTTPResult {
 }
 
 // pub fn send_message(message: Message) -> CleytoResult<()> {}
-
-pub fn submit_transaction(
-    data: &POSTData,
-    state: Arc<Mutex<NodeState>>,
-) -> HTTPResult {
-    // Deserializes the transactoibn
-    let body = data.body.clone().unwrap();
-    let transaction: Transaction = match serde_json::from_str(&body) {
-        Ok(tx) => tx,
-        Err(_) => return Err(HTTPResponseError::InvalidBody(None)),
-    };
-
-    // Check if the funds are enough for the transaction
-
-    match Transaction::check_transaction(&transaction) {
-        Ok(tx) => tx,
-        Err(e) => {
-            return match e {
-                TransactionDeserializeError::InsufficientFunds => {
-                    Err(HTTPResponseError::InvalidBody(None))
-                }
-                TransactionDeserializeError::MalformedTransaction => {
-                    Err(HTTPResponseError::InvalidBody(None))
-                }
-                TransactionDeserializeError::SerdeError(_) => {
-                    Err(HTTPResponseError::InvalidBody(None))
-                }
-            }
-        }
-    }
-    match transaction.verify_signature() {
-        Ok(()) => {}
-        Err(e) => {
-            return match e {
-                TransactionError::OpenSSLError(_) => Err(HTTPResponseError::InternalServerError(
-                    Some("Error in the OpenSSL library when verifying a transaction".to_string()),
-                )),
-                TransactionError::ValidationError => Err(HTTPResponseError::BadRequest(Some(
-                    "Transaction submitted with \
-                    invalid signature"
-                        .to_string(),
-                ))),
-                TransactionError::InsufficientInputs => Err(HTTPResponseError::BadRequest(Some(
-                    "Transaction's outputs are bigger that its inputs".to_string(),
-                ))),
-                // TODO Should move both of those to another error enum, maybe client and server errors
-                TransactionError::InsufficientFunds => panic!("Not the server's problem"),
-                TransactionError::ConnectionError(_) => panic!("Not the server's problem"),
-            };
-        }
-    };
-
-    state.lock().unwrap().transactions_pool.push(transaction);
-
-    Ok(HTTPResponse::OK(Some(Content::JSON(json!({
-        "msg": "The transaction was added to the pool.",
-        "status_code": "200"
-    })))))
-}
 
 pub fn get_transaction_pool(
     _: &GETData,
@@ -165,8 +105,11 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
             }
         },
         Message::Transaction(transaction) => {
-            let transaction_pool = &mut state.lock().unwrap().transactions_pool;
-            let connected_nodes = &state.lock().unwrap().connected_nodes;
+            let transaction_pool =
+                &mut state.lock().unwrap().transactions_pool.clone();
+            let connected_nodes =
+                &state.lock().unwrap().connected_nodes.clone();
+
             // TODO eventually add the source
             process_new_transaction(
                 transaction,
@@ -214,11 +157,6 @@ pub fn resolve_endpoint(
             add_endpoints("/", Some(index), None);
             add_endpoints("/favicon.ico", Some(favicon), None);
             add_endpoints("/status", Some(status), None);
-            add_endpoints(
-                "/submit-transaction",
-                None,
-                Some(submit_transaction),
-            );
             add_endpoints(
                 "/get-transaction-pool",
                 Some(get_transaction_pool),

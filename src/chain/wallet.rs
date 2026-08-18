@@ -1,7 +1,7 @@
+use super::transaction::TransactionInfo;
 use crate::chain::ordered_vector::OrderedVec;
 use crate::chain::utxo::UTXO;
-
-use super::transaction::TransactionInfo;
+use crate::configs::ConfigPaths;
 use openssl::error::ErrorStack;
 
 pub use super::wallet_pk::WalletPK;
@@ -188,6 +188,26 @@ impl Wallet {
         }
     }
 
+    pub fn save_as(&self, name: &String) {
+        let pem_public = self.to_pem();
+
+        // creates dir for keys
+        std::fs::create_dir(format!(
+            "{}/{name}",
+            ConfigPaths::get().wallets_path
+        ))
+        .unwrap();
+
+        std::fs::write(
+            format!("{}/{name}/public.pem", ConfigPaths::get().wallets_path),
+            pem_public,
+        )
+        .expect("Could not write public.pem");
+    }
+
+    pub fn null_wallet() -> Wallet {
+        Wallet::new().0
+    }
     /* --------------------------------------------------------------------- *
      *                         Coin‑Selection Logic                         *
      * --------------------------------------------------------------------- */

@@ -5,7 +5,8 @@ use cleyto_coin::{
 
 #[test]
 fn serialize_and_deserialize_node() {
-    let mut chain = Chain::new();
+    let mut chain =
+        Chain::new(cleyto_coin::chain::wallet::Wallet::null_wallet(), vec![]);
 
     chain.add_block(Block::test_block(&chain));
     chain.add_block(Block::test_block(&chain));

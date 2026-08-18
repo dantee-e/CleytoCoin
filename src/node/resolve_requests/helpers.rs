@@ -13,19 +13,19 @@ pub type HTTPResult = Result<HTTPResponse, HTTPResponseError>;
 pub type POSTFunc = fn(&POSTData, Arc<Mutex<NodeState>>) -> HTTPResult;
 pub type GETFunc = fn(&GETData, Arc<Mutex<NodeState>>) -> HTTPResult;
 pub fn path_not_found(s: Option<&str>) -> HTTPResult {
-    if s.is_some() {
+    if let Some(s) = s {
         return Err(HTTPResponseError::InvalidPath(Some(format!(
             "Path {} was not found",
-            s.unwrap()
+            s
         ))));
     }
     Err(HTTPResponseError::InvalidPath(None))
 }
 pub fn method_not_allowed(s: Option<&str>) -> HTTPResult {
-    if s.is_some() {
+    if let Some(s) = s {
         return Err(HTTPResponseError::InvalidMethod(Some(format!(
             "Attempt of accessing the path {} with wrong method",
-            s.unwrap()
+            s
         ))));
     }
     Err(HTTPResponseError::InvalidMethod(None))

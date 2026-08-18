@@ -10,6 +10,7 @@ pub struct ConfigPaths {
     #[allow(unused)]
     pub(crate) block_dir: String,
     pub(crate) last_block: String,
+    pub(crate) wallets_path: String,
 }
 impl ConfigPaths {
     pub fn get() -> Self {
@@ -20,6 +21,7 @@ impl ConfigPaths {
             sockets_dir: String::from(".config/cleyto_coin/sockets"),
             block_dir: String::from(".cleyto_coin/blocks"),
             last_block: String::from(".cleyto_coin/last_block"),
+            wallets_path: String::from("./wallets"),
         }
     }
 }

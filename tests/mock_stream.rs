@@ -32,12 +32,12 @@ impl Stream for MockStream {}
 
 impl Unpin for MockStream {}
 
+/// This is for raw data. If you want a more organized function, use
+/// request(&str, &str, Option<&str>, NodeState).
 pub async fn send_data(
     input_bytes: &[u8],
-    state: NodeState,
+    state: Arc<Mutex<NodeState>>,
 ) -> Result<Option<String>, Option<String>> {
-    let state = Arc::new(Mutex::new(state));
-
     let input_bytes_size = input_bytes.len();
 
     let mut contents = vec![0u8; input_bytes_size];
@@ -48,6 +48,27 @@ pub async fn send_data(
     };
 
     Node::handle_connection(state, Box::new(stream))
+}
+
+fn raw_request(method: &str, path: &str, body: Option<&str>) -> Vec<u8> {
+    match body {
+            Some(b) => format!(
+                "{method} {path} HTTP/1.1\r\nhost: localhost\r\ncontent-length: {}\r\n\r\n{}",
+                b.len(),
+                b
+            )
+            .into_bytes(),
+            None => format!("{method} {path} HTTP/1.1\r\nhost: localhost\r\n\r\n").into_bytes(),
+        }
+}
+
+pub async fn request(
+    method: &str,
+    path: &str,
+    body: Option<&str>,
+    state: Arc<Mutex<NodeState>>,
+) -> Result<Option<String>, Option<String>> {
+    send_data(&raw_request(method, path, body), state).await
 }
 
 #[tokio::test]

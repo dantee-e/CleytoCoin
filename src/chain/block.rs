@@ -2,6 +2,10 @@ use chrono::{DateTime, Utc};
 use openssl::hash::{Hasher, MessageDigest};
 use serde::{Deserialize, Serialize};
 
+use crate::chain::transaction::TransactionInfo;
+use crate::chain::utxo::UTXO;
+use crate::chain::wallet::Wallet;
+
 use super::transaction::Transaction;
 use super::utils::PROOF_OF_WORK_DIFFICULTY;
 use super::Chain;
@@ -173,8 +177,22 @@ impl Block {
         block
     }
 
-    pub fn genesis_block() -> Self {
-        let merkle_root = Block::calculate_merkle_root(&[]);
+    pub fn genesis_block(
+        first_receiver: Wallet,
+        utxo_original: Vec<UTXO>,
+    ) -> Self {
+        let transaction_info =
+            TransactionInfo::new(utxo_original.clone(), utxo_original);
+
+        let transaction = Transaction {
+            sender: Wallet::null_wallet(),
+            receiver: first_receiver,
+            signature: vec![0; 64],
+            transaction_info,
+            txid: [0; 32],
+        };
+
+        let merkle_root = Block::calculate_merkle_root(&[transaction]);
         Self {
             version: 1,
             previous_hash: String::from("Foguete nao da re"),

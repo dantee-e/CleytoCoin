@@ -14,6 +14,7 @@ pub enum CleytonError {
     ReadWriteError(io::Error),
     LastBlockLessThanZero,
     SendMessageError(String),
+    OpenSslErrorStack(openssl::error::ErrorStack),
 }
 
 impl From<io::Error> for CleytonError {
@@ -25,5 +26,11 @@ impl From<io::Error> for CleytonError {
 impl From<serde_json::Error> for CleytonError {
     fn from(value: serde_json::Error) -> Self {
         CleytonError::GenericSerdeError(value)
+    }
+}
+
+impl From<openssl::error::ErrorStack> for CleytonError {
+    fn from(value: openssl::error::ErrorStack) -> Self {
+        CleytonError::OpenSslErrorStack(value)
     }
 }

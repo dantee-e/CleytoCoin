@@ -181,7 +181,8 @@ pub fn remove_block_by_number(block_number: u32) -> CleytoResult<()> {
 
 /// If no hash is provided, reads from block number 0
 pub fn read_chain(block_hashes: Option<Vec<String>>) -> CleytoResult<Chain> {
-    let mut chain = Chain::new();
+    let mut chain =
+        Chain::new(crate::chain::wallet::Wallet::null_wallet(), vec![]);
 
     if let Some(block_hashes) = block_hashes {
         for hash in block_hashes {

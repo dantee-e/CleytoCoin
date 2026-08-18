@@ -8,7 +8,7 @@ mod wallet_pk;
 use block::Block;
 use serde::{Deserialize, Serialize};
 
-use crate::chain::block::BlockHeader;
+use crate::chain::{block::BlockHeader, utxo::UTXO, wallet::Wallet};
 
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Chain {
@@ -16,9 +16,9 @@ pub struct Chain {
 }
 
 impl Chain {
-    pub fn new() -> Self {
+    pub fn new(first_receiver: Wallet, utxo_original: Vec<UTXO>) -> Self {
         let mut chain = Self { blocks: Vec::new() };
-        chain.create_genesis_block();
+        chain.create_genesis_block(first_receiver, utxo_original);
         chain
     }
 
@@ -27,8 +27,12 @@ impl Chain {
         self.blocks.push(block);
     }
 
-    pub fn create_genesis_block(&mut self) -> Block {
-        let genesis = Block::genesis_block();
+    pub fn create_genesis_block(
+        &mut self,
+        first_receiver: Wallet,
+        utxo_original: Vec<UTXO>,
+    ) -> Block {
+        let genesis = Block::genesis_block(first_receiver, utxo_original);
         self.add_block(genesis.clone());
         genesis
     }
@@ -88,7 +92,7 @@ pub mod testing {
         )
         .unwrap();
 
-        let mut chain = Chain::new();
+        let mut chain = Chain::new(Wallet::null_wallet(), vec![]);
         let block_1 = Block::new(&mut chain, vec![transaction_1]);
         chain.add_block(block_1);
 

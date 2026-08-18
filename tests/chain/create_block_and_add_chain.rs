@@ -31,7 +31,7 @@ fn create_block_and_add_chain() {
         Transaction::new(wallet1, wallet2, transaction_info, signature)
             .unwrap();
 
-    let mut chain = Chain::new();
+    let mut chain = Chain::new(Wallet::null_wallet(), vec![]);
 
     let block = Block::new(&mut chain, vec![new_transaction]);
 

@@ -57,7 +57,7 @@ async fn send_transaction(
     }
 }
 
-fn read_key_string_or_file(
+pub fn read_key_string_or_file(
     string: &Option<String>,
     file: &Option<PathBuf>,
 ) -> String {
@@ -178,7 +178,8 @@ pub fn run_server_with_gui(server_name: String) -> color_eyre::Result<()> {
     // Channel to kill thread
     // let rx = Arc::new(Mutex::new(rx));
 
-    let (mut node, logger) = node::Node::new(Chain::new(), server_name);
+    let (mut node, logger) =
+        node::Node::new(Chain::new(Wallet::null_wallet(), vec![]), server_name);
 
     let node_name = node.name.to_string();
     // Run server thread
@@ -205,7 +206,10 @@ pub fn run_server_with_gui(server_name: String) -> color_eyre::Result<()> {
 /// Mostly useful for testing
 /// Returns the created server's name, to enable killing it later
 pub fn run_server_thread(server_name: String) -> String {
-    let (mut node, _) = node::Node::new(Chain::new(), server_name.to_string());
+    let (mut node, _) = node::Node::new(
+        Chain::new(Wallet::null_wallet(), vec![]),
+        server_name.to_string(),
+    );
 
     thread::spawn(move || {
         node.run(true, 0);
@@ -215,7 +219,8 @@ pub fn run_server_thread(server_name: String) -> String {
 }
 
 pub fn run_server(server_name: String) {
-    let (mut node, _) = node::Node::new(Chain::new(), server_name);
+    let (mut node, _) =
+        node::Node::new(Chain::new(Wallet::null_wallet(), vec![]), server_name);
     node.run(true, 0);
 }
 

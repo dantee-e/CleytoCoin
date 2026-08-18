@@ -55,7 +55,10 @@ impl Default for NodeState {
     fn default() -> Self {
         NodeState {
             status: true,
-            chain: Chain::new(),
+            chain: Chain::new(
+                crate::chain::wallet::Wallet::null_wallet(),
+                vec![],
+            ),
             transactions_pool: Vec::new(),
             connected_nodes: HashSet::new(),
         }
@@ -79,7 +82,7 @@ impl Default for NodeConfig {
 
 #[derive(Serialize, Deserialize)]
 pub struct Node {
-    state: Arc<Mutex<NodeState>>,
+    pub state: Arc<Mutex<NodeState>>,
 
     // The logs are manually saved on shutdown and reloaded on initialization
     #[serde(skip)]
