@@ -2,6 +2,7 @@ pub mod data;
 pub mod logger;
 pub mod ui;
 
+mod db_interactions;
 mod resolve_requests;
 mod stream;
 mod thread_pool;

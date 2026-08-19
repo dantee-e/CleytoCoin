@@ -1,5 +1,7 @@
 use super::utxo::UTXO;
 use super::wallet::Wallet;
+use crate::chain::utxo::TransactionInput;
+use crate::chain::utxo::TransactionOutput;
 use crate::error_handling::TransactionDeserializeError;
 use crate::error_handling::TransactionError;
 use chrono::{DateTime, Utc};
@@ -9,16 +11,20 @@ use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
 // ---------------------------------------------- TransactionInfo definition -----------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransactionInfo {
-    pub inputs: Vec<UTXO>,
-    pub outputs: Vec<UTXO>,
+    pub inputs: Vec<TransactionInput>,
+    pub outputs: Vec<TransactionOutput>,
     pub date: DateTime<Utc>,
 }
 
 impl TransactionInfo {
-    pub fn new(inputs: Vec<UTXO>, outputs: Vec<UTXO>) -> TransactionInfo {
+    pub fn new(
+        inputs: Vec<TransactionInput>,
+        outputs: Vec<TransactionOutput>,
+    ) -> TransactionInfo {
         let date = Utc::now();
         Self {
             inputs,
@@ -57,7 +63,6 @@ impl Display for TransactionInfo {
 pub struct Transaction {
     pub sender: Wallet,
     pub receiver: Wallet,
-    pub signature: Vec<u8>,
     pub transaction_info: TransactionInfo,
     pub txid: [u8; 32], // hash
 }
@@ -81,19 +86,31 @@ impl Transaction {
         sender: Wallet,
         receiver: Wallet,
         transaction_info: TransactionInfo,
-        signature: Vec<u8>,
     ) -> Result<Self, TransactionError> {
         let mut transaction = Self {
             sender,
             receiver,
-            signature,
             transaction_info,
             txid: [0; 32], // This could be optimized by avoiding the creation of this Vec, which
                            // serves no function on its own, but I don't really see that being a problem
         };
 
-        let input_sum = UTXO::sum(&transaction.transaction_info.inputs);
-        let output_sum = UTXO::sum(&transaction.transaction_info.outputs);
+        let input_utxos: Vec<UTXO> = transaction
+            .transaction_info
+            .inputs
+            .iter()
+            .map(|input| input.utxo.clone())
+            .collect();
+
+        let output_utxos: Vec<UTXO> = transaction
+            .transaction_info
+            .outputs
+            .iter()
+            .map(|output| output.utxo.clone())
+            .collect();
+
+        let input_sum = UTXO::sum(&input_utxos);
+        let output_sum = UTXO::sum(&output_utxos);
         let change: i64 = input_sum as i64 - output_sum as i64;
 
         if change < 0 {
@@ -120,10 +137,7 @@ impl Transaction {
     }
 
     pub(crate) fn verify_signature(&self) -> Result<(), TransactionError> {
-        match self
-            .sender
-            .verify_transaction_info(&self.transaction_info, &self.signature)
-        {
+        match self.sender.verify_transaction_info(&self.transaction_info) {
             Ok(value) => match value {
                 true => Ok(()),
                 false => Err(TransactionError::ValidationError),

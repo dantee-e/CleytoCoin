@@ -156,12 +156,16 @@ impl Wallet {
     pub fn verify_transaction_info(
         &self,
         transaction_info: &TransactionInfo,
-        signature: &[u8],
     ) -> Result<bool, ErrorStack> {
-        let mut verifier =
-            Verifier::new(MessageDigest::sha256(), &self.public_key)?;
-        verifier.update(transaction_info.to_string().as_bytes())?;
-        verifier.verify(signature)
+        for input in &transaction_info.inputs {
+            let mut verifier =
+                Verifier::new(MessageDigest::sha256(), &self.public_key)?;
+            verifier.update(input.utxo.to_string().as_bytes())?;
+            if !verifier.verify(&input.signature)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Export the public key as PEM bytes.

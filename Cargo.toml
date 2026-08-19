@@ -33,4 +33,5 @@ serde_bytes = "0.11.19"
 regex = "1.12.4"
 serial_test = "3.5.0"
 async-std = "1.13.2"
+postgres = "0.19.14"
 
