@@ -116,7 +116,7 @@ pub async fn send(
     sender_key_file: Option<PathBuf>,
     password: Option<String>,
     amount: u64,
-) -> Result<(), TransactionError> {
+) -> CleytoResult<()> {
     let recipient_key_str =
         read_key_string_or_file(&recipient_key, &recipient_key_file);
     let sender_key_str = read_key_string_or_file(&sender_key, &sender_key_file);
@@ -142,10 +142,11 @@ pub async fn send(
     let recipient_wallet = Wallet::from(recipient_pkey);
 
     // find input utxos
-    let input_utxos = match sender_wallet.public_wallet().get_utxos(amount) {
-        Ok(vec) => vec,
-        Err(_) => return Err(TransactionError::InsufficientFunds),
-    };
+    let input_utxos: Vec<TransactionInput> =
+        match sender_wallet.public_wallet().get_utxos(amount) {
+            Ok(vec) => vec,
+            Err(_) => return Err(TransactionError::InsufficientFunds)?,
+        };
 
     // Create output UTXOs
     let input_sum = UTXO::sum(&input_utxos);
@@ -155,7 +156,7 @@ pub async fn send(
         UTXO::new(input_sum - amount, sender_wallet.public_wallet());
     let output_utxos = vec![change_utxo, recipients_utxo];
 
-    // create transaction info
+    // create transaction
     let mut transaction = Transaction::new(input_utxos, output_utxos)?;
 
     // sign the transaction

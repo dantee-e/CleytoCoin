@@ -1,6 +1,6 @@
 use super::transaction::Transaction;
 use crate::chain::ordered_vector::OrderedVec;
-use crate::chain::utxo::{TransactionOutput, UTXO};
+use crate::chain::utxo::{TransactionInput, TransactionOutput};
 use crate::configs::ConfigPaths;
 use crate::error_handling::{CleytoResult, TransactionError};
 
@@ -229,10 +229,11 @@ impl Wallet {
      * --------------------------------------------------------------------- */
     /// Public entry point – selects a set of UTXOs whose summed value covers
     /// `amount`. Returns an error if the wallet does not contain enough funds.
+    /// Returns the TransactionOutputs as TransactionInputs
     pub fn get_utxos(
         &self,
         amount: u64,
-    ) -> Result<Vec<TransactionOutput>, WalletError> {
+    ) -> Result<Vec<TransactionInput>, WalletError> {
         let utxos = self
             .available_utxos
             .as_ref()
@@ -248,7 +249,7 @@ impl Wallet {
         if let Some(single) =
             utxos.clone().into_iter().find(|u| u.value == amount)
         {
-            return Ok(vec![single.clone()]);
+            return Ok(vec![single.clone().into()]);
         }
 
         // smallest UTXO that already exceeds the target
@@ -283,8 +284,13 @@ impl Wallet {
             total_sum,
         );
 
+        let bnb_solution_as_inputs = bnb_solution
+            .into_iter()
+            .map(|output| output.into())
+            .collect::<Vec<TransactionInput>>();
+
         if !bnb_solution.is_empty() {
-            return Ok(bnb_solution);
+            return Ok(bnb_solution_as_inputs);
         } else {
             println!("bnb solution is empty");
         }
@@ -308,7 +314,12 @@ impl Wallet {
         if solution.is_empty() {
             return Err(WalletError::InsufficientFunds);
         }
-        Ok(solution)
+
+        let solution_as_inputs = solution
+            .into_iter()
+            .map(|output| output.into())
+            .collect::<Vec<TransactionInput>>();
+        Ok(solution_as_inputs)
     }
 
     // Helper: compute “waste” (extra fee paid beyond the long‑term rate).

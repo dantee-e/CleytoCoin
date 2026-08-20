@@ -1,7 +1,6 @@
 use super::utxo::UTXO;
 use super::wallet::Wallet;
 use crate::chain::ordered_vector::OrderedVec;
-use crate::chain::utxo::OutPoint;
 use crate::chain::utxo::TransactionInput;
 use crate::chain::utxo::TransactionOutput;
 use crate::error_handling::CleytoResult;
@@ -43,7 +42,7 @@ impl Transaction {
 
     pub fn new(
         inputs: Vec<TransactionInput>,
-        outputs: Vec<TransactionOutput>,
+        mut outputs: Vec<TransactionOutput>,
     ) -> CleytoResult<Self> {
         let input_sum = TransactionInput::sum(&inputs);
         let output_sum = UTXO::sum(&outputs);
@@ -52,6 +51,10 @@ impl Transaction {
 
         if change < 0 {
             return Err(TransactionError::InsufficientInputs)?;
+        }
+
+        for (i, output) in outputs.iter_mut().enumerate() {
+            output.index = Some(i as u32)
         }
 
         let mut transaction = Self {
@@ -120,16 +123,8 @@ impl Default for Transaction {
 
         let value: u64 = rand::random();
 
-        let input = TransactionInput::new(
-            value,
-            sender.clone(),
-            OutPoint::new(Some([0; 32]), 0),
-        );
-        let output = TransactionOutput::new(
-            value,
-            receiver.clone(),
-            OutPoint::new(Some([1; 32]), 0),
-        );
+        let input = TransactionInput::new(value, sender.clone());
+        let output = TransactionOutput::new(value, receiver.clone());
 
         let mut transaction_info =
             Transaction::new(vec![input], vec![output]).unwrap();

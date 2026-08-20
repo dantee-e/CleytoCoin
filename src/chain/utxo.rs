@@ -2,41 +2,23 @@ use super::wallet::Wallet;
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, fmt::Display};
 
-pub trait UTXO:
-    Display
-    + for<'de> Deserialize<'de>
-    + Serialize
-    + Clone
-    + PartialEq
-    + Eq
-    + Ord
-    + PartialOrd
-{
-    fn new(value: u64, owner: Wallet, outpoint: OutPoint) -> Self;
-
-    fn sum<T>(vec: &T) -> u64
-    where
-        T: IntoIterator<Item = Self>,
-        T: Clone;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct OutPoint {
-    pub txid: Option<[u8; 32]>,
-    pub index: u32,
-}
-
-impl OutPoint {
-    pub fn new(txid: Option<[u8; 32]>, index: u32) -> Self {
-        Self { txid, index }
-    }
-}
-
-impl Display for OutPoint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "TXID::{:?}::INDEX::{}", self.txid, self.index)
-    }
-}
+// pub trait UTXO:
+//     Display
+//     + for<'de> Deserialize<'de>
+//     + Serialize
+//     + Clone
+//     + PartialEq
+//     + Eq
+//     + Ord
+//     + PartialOrd
+// {
+//     fn new(value: u64, owner: Wallet) -> Self;
+//
+//     fn sum<T>(vec: &T) -> u64
+//     where
+//         T: IntoIterator<Item = Self>,
+//         T: Clone;
+// }
 
 // ----------------------- TRANSACTION INPUT -----------------------
 
@@ -45,25 +27,39 @@ pub struct TransactionInput {
     pub signature: Option<Vec<u8>>,
     pub value: u64,
     pub owner: Wallet,
-    pub outpoint: OutPoint,
+    pub index: Option<u32>,
+    pub txid: Option<[u8; 32]>,
 }
 
-impl UTXO for TransactionInput {
-    fn new(value: u64, owner: Wallet, outpoint: OutPoint) -> Self {
+impl TransactionInput {
+    pub fn new(value: u64, owner: Wallet) -> Self {
         Self {
             value,
             owner,
             signature: None,
-            outpoint,
+            index: None,
+            txid: None,
         }
     }
 
-    fn sum<T>(vec: &T) -> u64
+    pub fn sum<T>(vec: &T) -> u64
     where
         T: IntoIterator<Item = Self>,
         T: Clone,
     {
         vec.clone().into_iter().map(|utxo| utxo.value).sum()
+    }
+}
+
+impl From<TransactionOutput> for TransactionInput {
+    fn from(value: TransactionOutput) -> Self {
+        Self {
+            value: value.value,
+            owner: value.owner,
+            index: value.index,
+            txid: value.txid,
+            signature: None,
+        }
     }
 }
 
@@ -130,19 +126,21 @@ impl Ord for TransactionInput {
 pub struct TransactionOutput {
     pub value: u64,
     pub owner: Wallet,
-    pub outpoint: OutPoint,
+    pub index: Option<u32>,
+    pub txid: Option<[u8; 32]>,
 }
 
-impl UTXO for TransactionOutput {
-    fn new(value: u64, owner: Wallet, outpoint: OutPoint) -> Self {
+impl TransactionOutput {
+    pub fn new(value: u64, owner: Wallet) -> Self {
         Self {
             value,
             owner,
-            outpoint,
+            index: None,
+            txid: None,
         }
     }
 
-    fn sum<T>(vec: &T) -> u64
+    pub fn sum<T>(vec: &T) -> u64
     where
         T: IntoIterator<Item = Self>,
         T: Clone,
@@ -153,6 +151,7 @@ impl UTXO for TransactionOutput {
 
 impl Display for TransactionOutput {
     /// This does not serialize the txid
+    /// This will panic if index is None
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let owner_pem = self.owner.to_pem();
         let owner = if let Ok(val) = String::from_utf8(owner_pem) {
@@ -160,10 +159,13 @@ impl Display for TransactionOutput {
         } else {
             panic!("Invalid UTF-8 when getting UTXO owner")
         };
+
         write!(
             f,
             "VALUE::{}::OWNER::{}::INDEX::{}",
-            self.value, owner, self.outpoint.index
+            self.value,
+            owner,
+            self.index.unwrap()
         )
     }
 }
