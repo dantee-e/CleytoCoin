@@ -1,4 +1,4 @@
-use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
+use cleyto_coin::chain::transaction::{Transaction};
 use cleyto_coin::chain::utxo::UTXO;
 use cleyto_coin::chain::wallet::Wallet;
 
@@ -15,8 +15,8 @@ fn create_transaction() {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_receiver.clone()),
     ];
-    let transaction_info: TransactionInfo =
-        TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: Transaction =
+        Transaction::new(input_utxos, output_utxos);
 
     let signature = match walletpk_sender.sign_transaction(&transaction_info) {
         Ok(signed_hashed_message) => signed_hashed_message,
@@ -61,8 +61,8 @@ fn test_transaction_info_creation() {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_receiver.clone()),
     ];
-    let transaction_info: TransactionInfo =
-        TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: Transaction =
+        Transaction::new(input_utxos, output_utxos);
     println!("transaction info:\n{}", transaction_info);
     println!("{:?}", transaction_info);
 }
@@ -80,8 +80,8 @@ fn sign_and_verify_transaction_info() {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_receiver.clone()),
     ];
-    let transaction_info: TransactionInfo =
-        TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: Transaction =
+        Transaction::new(input_utxos, output_utxos);
 
     let signature = match wallet_pk.sign_transaction(&transaction_info) {
         Ok(signed_hashed_message) => signed_hashed_message,
@@ -115,8 +115,8 @@ fn serialize_and_deserialize_transaction() {
         UTXO::new(2500, mallet.clone()),
         UTXO::new(500, mallet.clone()),
     ];
-    let transaction_info: TransactionInfo =
-        TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: Transaction =
+        Transaction::new(input_utxos, output_utxos);
 
     let signature = match wallet_pk.sign_transaction(&transaction_info) {
         Ok(signed_hashed_message) => signed_hashed_message,

@@ -1,4 +1,4 @@
-use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
+use cleyto_coin::chain::transaction::{Transaction};
 use cleyto_coin::chain::utxo::UTXO;
 use cleyto_coin::chain::wallet::Wallet;
 use reqwest::Client;
@@ -42,8 +42,8 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
         UTXO::new(2500, wallet_receiver.clone()),
         UTXO::new(500, wallet_sender.clone()),
     ];
-    let transactioninfo: TransactionInfo =
-        TransactionInfo::new(input_utxos, output_utxos);
+    let transactioninfo: Transaction =
+        Transaction::new(input_utxos, output_utxos);
 
     let signature = match walletpk_sender.sign_transaction(&transactioninfo) {
         Ok(signed_hashed_message) => signed_hashed_message,

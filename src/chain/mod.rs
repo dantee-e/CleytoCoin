@@ -63,7 +63,7 @@ pub mod testing {
     use super::Chain;
     use crate::chain::block::Block;
     use crate::chain::{
-        transaction::{Transaction, TransactionInfo},
+        transaction::{Transaction},
         utxo::UTXO,
         wallet::Wallet,
     };
@@ -81,7 +81,7 @@ pub mod testing {
             UTXO::new(50000, wallet_1.0.clone()),
             UTXO::new(50000, wallet_2.0.clone()),
         ];
-        let transaction_info_1 = TransactionInfo::new(utxos_1, utxos_1_output);
+        let transaction_info_1 = Transaction::new(utxos_1, utxos_1_output);
         let signature_1 =
             wallet_1.1.sign_transaction(&transaction_info_1).unwrap();
         let transaction_1 = Transaction::new(
@@ -100,7 +100,7 @@ pub mod testing {
         //              wallet_2 sends 50000 split to wallet_3 and wallet_4 ---
         let utxos_2 = vec![UTXO::new(50000, wallet_1.0.clone())];
         let utxos_2_output = vec![UTXO::new(50000, wallet_3.0.clone())];
-        let transaction_info_2 = TransactionInfo::new(utxos_2, utxos_2_output);
+        let transaction_info_2 = Transaction::new(utxos_2, utxos_2_output);
         let signature_2 =
             wallet_1.1.sign_transaction(&transaction_info_2).unwrap();
         let transaction_2 = Transaction::new(
@@ -116,7 +116,7 @@ pub mod testing {
             UTXO::new(25000, wallet_3.0.clone()),
             UTXO::new(25000, wallet_4.0.clone()),
         ];
-        let transaction_info_3 = TransactionInfo::new(utxos_3, utxos_3_output);
+        let transaction_info_3 = Transaction::new(utxos_3, utxos_3_output);
         let signature_3 =
             wallet_2.1.sign_transaction(&transaction_info_3).unwrap();
         let transaction_3 = Transaction::new(
@@ -138,7 +138,7 @@ pub mod testing {
             UTXO::new(25000, wallet_3.0.clone()),
         ];
         let utxos_4_output = vec![UTXO::new(75000, wallet_5.0.clone())];
-        let transaction_info_4 = TransactionInfo::new(utxos_4, utxos_4_output);
+        let transaction_info_4 = Transaction::new(utxos_4, utxos_4_output);
         let signature_4 =
             wallet_3.1.sign_transaction(&transaction_info_4).unwrap();
         let transaction_4 = Transaction::new(
@@ -154,7 +154,7 @@ pub mod testing {
             UTXO::new(10000, wallet_1.0.clone()),
             UTXO::new(15000, wallet_5.0.clone()),
         ];
-        let transaction_info_5 = TransactionInfo::new(utxos_5, utxos_5_output);
+        let transaction_info_5 = Transaction::new(utxos_5, utxos_5_output);
         let signature_5 =
             wallet_4.1.sign_transaction(&transaction_info_5).unwrap();
         let transaction_5 = Transaction::new(
@@ -181,7 +181,7 @@ pub mod testing {
             UTXO::new(20000, wallet_4.0.clone()),
             UTXO::new(10000, wallet_5.0.clone()),
         ];
-        let transaction_info_6 = TransactionInfo::new(utxos_6, utxos_6_output);
+        let transaction_info_6 = Transaction::new(utxos_6, utxos_6_output);
         let signature_6 =
             wallet_5.1.sign_transaction(&transaction_info_6).unwrap();
         let transaction_6 = Transaction::new(

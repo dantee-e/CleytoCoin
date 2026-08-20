@@ -1,8 +1,8 @@
+use super::transaction::Transaction;
+use crate::chain::utxo::TransactionInput;
+use crate::chain::wallet::Wallet;
 use crate::configs::ConfigPaths;
 use crate::error_handling::CleytoResult;
-
-use super::transaction::TransactionInfo;
-use super::wallet::Wallet;
 use openssl::error::ErrorStack;
 use openssl::hash::MessageDigest;
 use openssl::pkey::{PKey, Private};
@@ -15,14 +15,50 @@ pub struct WalletPK {
 }
 
 impl WalletPK {
-    pub fn sign_transaction(
+    // pub fn sign_transaction(
+    //     &self,
+    //     transaction_info: &TransactionInfo,
+    // ) -> Result<Vec<u8>, ErrorStack> {
+    //     let mut signer =
+    //         Signer::new(MessageDigest::sha256(), &self.private_key)?;
+    //     signer.sign_oneshot_to_vec(transaction_info.to_string().as_bytes())
+    // }
+
+    /// Signs input inplace
+    pub fn sign_input(
         &self,
-        transaction_info: &TransactionInfo,
-    ) -> Result<Vec<u8>, ErrorStack> {
+        input: &mut TransactionInput,
+        transaction_info: &Transaction,
+    ) -> Result<(), ErrorStack> {
         let mut signer =
             Signer::new(MessageDigest::sha256(), &self.private_key)?;
-        signer.sign_oneshot_to_vec(transaction_info.to_string().as_bytes())
+        let signature = signer.sign_oneshot_to_vec(
+            &transaction_info.get_ordered_bytes_for_signing(input),
+        )?;
+        input.signature = signature;
+        Ok(())
     }
+
+    pub fn sign_all_owned_inputs_in_transaction(
+        &self,
+        transaction_info: &mut Transaction,
+    ) -> Result<(), ErrorStack> {
+        let transaction_info_clone = transaction_info.clone();
+
+        let wallet = self.public_wallet();
+        let inputs: Vec<&mut TransactionInput> = transaction_info
+            .inputs
+            .iter_mut()
+            .filter(|input| input.owner == wallet)
+            .collect();
+
+        for input in inputs {
+            self.sign_input(input, &transaction_info_clone)?;
+        }
+
+        Ok(())
+    }
+
     pub fn to_pem_with_password(&self, password: &str) -> Vec<u8> {
         self.private_key
             .private_key_to_pem_pkcs8_passphrase(

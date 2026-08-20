@@ -2,13 +2,11 @@ use chrono::{DateTime, Utc};
 use openssl::hash::{Hasher, MessageDigest};
 use serde::{Deserialize, Serialize};
 
-use crate::chain::transaction::TransactionInfo;
-use crate::chain::utxo::UTXO;
-use crate::chain::wallet::Wallet;
-
-use super::transaction::Transaction;
 use super::utils::PROOF_OF_WORK_DIFFICULTY;
 use super::Chain;
+use crate::chain::transaction::Transaction;
+use crate::chain::utxo::UTXO;
+use crate::chain::wallet::Wallet;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -182,7 +180,7 @@ impl Block {
         utxo_original: Vec<UTXO>,
     ) -> Self {
         let transaction_info =
-            TransactionInfo::new(utxo_original.clone(), utxo_original);
+            Transaction::new(utxo_original.clone(), utxo_original);
 
         let transaction = Transaction {
             sender: Wallet::null_wallet(),

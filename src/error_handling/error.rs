@@ -17,6 +17,12 @@ pub enum CleytonError {
     OpenSslErrorStack(openssl::error::ErrorStack),
 }
 
+impl From<TransactionError> for CleytonError {
+    fn from(value: TransactionError) -> Self {
+        CleytonError::TransactionError(value)
+    }
+}
+
 impl From<io::Error> for CleytonError {
     fn from(value: io::Error) -> Self {
         CleytonError::ReadWriteError(value)

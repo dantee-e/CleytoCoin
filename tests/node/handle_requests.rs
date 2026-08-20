@@ -7,7 +7,7 @@ mod handle_connection_tests {
     use cleyto_coin::node::Message;
     use cleyto_coin::{
         chain::{
-            transaction::{Transaction, TransactionInfo},
+            transaction::{Transaction},
             utxo::UTXO,
             wallet::Wallet,
         },
@@ -27,7 +27,7 @@ mod handle_connection_tests {
         let receiver = Wallet::new();
         let inputs = vec![UTXO::new(1000, sender.0.clone())];
         let outputs = vec![UTXO::new(1000, receiver.0.clone())];
-        let info = TransactionInfo::new(inputs, outputs);
+        let info = Transaction::new(inputs, outputs);
         let signature = sender.1.sign_transaction(&info).unwrap();
         Transaction::new(sender.0.clone(), receiver.0.clone(), info, signature)
             .unwrap()
@@ -202,7 +202,7 @@ mod handle_connection_tests {
         // signature validity before accepting into the pool.
         let mut tx = test_transaction();
         let bogus = Wallet::new();
-        let bogus_info = TransactionInfo::new(
+        let bogus_info = Transaction::new(
             vec![UTXO::new(1, bogus.0.clone())],
             vec![UTXO::new(1, bogus.0.clone())],
         );

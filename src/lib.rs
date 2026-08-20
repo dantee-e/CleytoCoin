@@ -1,6 +1,6 @@
 use crate::{
     chain::{
-        transaction::{self, Transaction, TransactionInfo},
+        transaction::{self, Transaction},
         utxo::UTXO,
         wallet::{Wallet, WalletPK},
         Chain,
@@ -155,7 +155,7 @@ pub async fn send(
     let output_utxos = vec![change_utxo, recipients_utxo];
 
     // create transaction info
-    let transaction_info = TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info = Transaction::new(input_utxos, output_utxos);
 
     // sign the transaction
     let signature = sender_wallet

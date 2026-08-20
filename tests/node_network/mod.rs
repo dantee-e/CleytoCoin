@@ -1,6 +1,6 @@
 use cleyto_coin::{
     chain::{
-        transaction::{Transaction, TransactionInfo},
+        transaction::{Transaction},
         utxo::UTXO,
         wallet::{Wallet, WalletPK},
         Chain,
@@ -44,7 +44,7 @@ async fn use_multiple_nodes() {
         println!("UTXO = {}", i);
     }
 
-    let transaction_info = TransactionInfo::new(
+    let transaction_info = Transaction::new(
         input_utxos,
         vec![UTXO::new(200, wallet1.0.clone()), UTXO::new(200, wallet2.0)],
     );

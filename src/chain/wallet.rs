@@ -1,6 +1,6 @@
-use super::transaction::TransactionInfo;
+use super::transaction::Transaction;
 use crate::chain::ordered_vector::OrderedVec;
-use crate::chain::utxo::UTXO;
+use crate::chain::utxo::{TransactionInput, UTXO};
 use crate::configs::ConfigPaths;
 use openssl::error::ErrorStack;
 
@@ -155,12 +155,15 @@ impl Wallet {
     /// Verify a signed `TransactionInfo` using the stored public key.
     pub fn verify_transaction_info(
         &self,
-        transaction_info: &TransactionInfo,
+        transaction_info: &Transaction,
     ) -> Result<bool, ErrorStack> {
         for input in &transaction_info.inputs {
             let mut verifier =
                 Verifier::new(MessageDigest::sha256(), &self.public_key)?;
-            verifier.update(input.utxo.to_string().as_bytes())?;
+            verifier.update(
+                &transaction_info.get_ordered_bytes_for_signing(&input),
+            )?;
+
             if !verifier.verify(&input.signature)? {
                 return Ok(false);
             }
@@ -176,12 +179,13 @@ impl Wallet {
     }
 
     /// Rough fee estimate per UTXO – replace with a real estimator later.
-    fn estimate_fee_per_utxo(_utxo: &UTXO) -> u64 {
+    // TODO
+    fn estimate_fee_per_utxo(_utxo: TransactionInput) -> u64 {
         100
     }
 
     /// Insert a batch of new UTXOs, keeping the internal ordering intact.
-    pub fn add_utxos(&mut self, new_vec: Vec<UTXO>) {
+    pub fn add_utxos(&mut self, new_vec: Vec<impl UTXO>) {
         match &mut self.available_utxos {
             Some(ord_vec) => {
                 for utxo in new_vec {
@@ -217,7 +221,10 @@ impl Wallet {
      * --------------------------------------------------------------------- */
     /// Public entry point – selects a set of UTXOs whose summed value covers
     /// `amount`. Returns an error if the wallet does not contain enough funds.
-    pub fn get_utxos(&self, amount: u64) -> Result<Vec<UTXO>, WalletError> {
+    pub fn get_utxos(
+        &self,
+        amount: u64,
+    ) -> Result<Vec<TransactionInput>, WalletError> {
         let utxos = self
             .available_utxos
             .as_ref()

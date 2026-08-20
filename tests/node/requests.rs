@@ -1,4 +1,4 @@
-use cleyto_coin::chain::transaction::{Transaction, TransactionInfo};
+use cleyto_coin::chain::transaction::{Transaction};
 use cleyto_coin::chain::utxo::UTXO;
 use cleyto_coin::chain::wallet::Wallet;
 use cleyto_coin::{kill_node, run_server_thread};
@@ -23,8 +23,8 @@ fn thread_post(n: u16) {
         UTXO::new(2500, wallet2.clone()),
         UTXO::new(500, wallet2.clone()),
     ];
-    let transaction_info: TransactionInfo =
-        TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: Transaction =
+        Transaction::new(input_utxos, output_utxos);
 
     let signature = match wallet1_pk.sign_transaction(&transaction_info) {
         Ok(value) => value,

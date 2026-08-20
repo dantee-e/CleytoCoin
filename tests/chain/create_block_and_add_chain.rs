@@ -1,6 +1,6 @@
 use cleyto_coin::chain::{
     block::Block,
-    transaction::{Transaction, TransactionInfo},
+    transaction::{Transaction},
     utxo::UTXO,
     wallet::Wallet,
     Chain,
@@ -19,8 +19,8 @@ fn create_block_and_add_chain() {
         UTXO::new(2500, wallet2.clone()),
         UTXO::new(500, wallet2.clone()),
     ];
-    let transaction_info: TransactionInfo =
-        TransactionInfo::new(input_utxos, output_utxos);
+    let transaction_info: Transaction =
+        Transaction::new(input_utxos, output_utxos);
 
     let signature = match wallet1_pk.sign_transaction(&transaction_info) {
         Ok(value) => value,

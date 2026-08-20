@@ -1,40 +1,146 @@
 use super::utxo::UTXO;
 use super::wallet::Wallet;
+use crate::chain::ordered_vector::OrderedVec;
+use crate::chain::utxo::OutPoint;
 use crate::chain::utxo::TransactionInput;
 use crate::chain::utxo::TransactionOutput;
+use crate::error_handling::CleytoResult;
 use crate::error_handling::TransactionDeserializeError;
 use crate::error_handling::TransactionError;
 use chrono::{DateTime, Utc};
 use openssl::sha::Sha256;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
 
 // ---------------------------------------------- TransactionInfo definition -----------------------
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TransactionInfo {
+pub struct Transaction {
     pub inputs: Vec<TransactionInput>,
     pub outputs: Vec<TransactionOutput>,
     pub date: DateTime<Utc>,
+    pub txid: [u8; 32],
 }
 
-impl TransactionInfo {
+impl Transaction {
+    /// Use this function to sign the transaction output + the individual input utxo
+    pub fn get_ordered_bytes_for_signing(
+        &self,
+        input: &TransactionInput,
+    ) -> Vec<u8> {
+        let mut bytes = input.to_string().into_bytes();
+
+        let mut bytes2: Vec<u8> = OrderedVec::from(self.outputs.clone())
+            .into_iter()
+            .map(|output| output.to_string().into_bytes())
+            .flatten()
+            .collect();
+
+        bytes.append(&mut bytes2);
+        bytes
+    }
+
     pub fn new(
         inputs: Vec<TransactionInput>,
         outputs: Vec<TransactionOutput>,
-    ) -> TransactionInfo {
-        let date = Utc::now();
-        Self {
+    ) -> CleytoResult<Self> {
+        let input_sum = TransactionInput::sum(&inputs);
+        let output_sum = UTXO::sum(&outputs);
+
+        let change: i64 = input_sum as i64 - output_sum as i64;
+
+        if change < 0 {
+            return Err(TransactionError::InsufficientInputs)?;
+        }
+
+        let mut transaction = Self {
             inputs,
             outputs,
-            date,
+            txid: [0; 32],
+            date: Utc::now(),
+        };
+
+        let to_hash = transaction.to_string();
+        let mut hasher: Sha256 = Sha256::new();
+        hasher.update(to_hash.as_bytes());
+        transaction.txid = hasher.finish().to_owned();
+
+        match transaction.verify_signatures() {
+            Ok(()) => Ok(transaction),
+            Err(error) => Err(error)?,
         }
+    }
+
+    pub fn to_header(&self) -> TransactionHeader {
+        TransactionHeader { txid: self.txid }
+    }
+
+    pub(crate) fn verify_signatures(&self) -> CleytoResult<()> {
+        for input in &self.inputs {
+            if !input.owner.verify_transaction_info(self)? {
+                return Err(TransactionError::ValidationError)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn serialize(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap()
+    }
+
+    pub fn check_sufficient_funds(
+        tx: &Transaction,
+    ) -> Result<(), TransactionDeserializeError> {
+        let input_sum = UTXO::sum(&tx.inputs);
+        println!("Input sum is {input_sum}");
+        let output_sum = UTXO::sum(&tx.outputs);
+        println!("Output sum is {output_sum}");
+        let change = input_sum as i64 - output_sum as i64;
+
+        if change < 0 {
+            return Err(TransactionDeserializeError::InsufficientFunds);
+        }
+
+        Ok(())
     }
 }
 
-impl Display for TransactionInfo {
+impl PartialEq for Transaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.txid == other.txid
+    }
+}
+
+impl Default for Transaction {
+    fn default() -> Self {
+        let (sender, sender_pk) = Wallet::new();
+        let (receiver, _) = Wallet::new();
+
+        let value: u64 = rand::random();
+
+        let input = TransactionInput::new(
+            value,
+            sender.clone(),
+            OutPoint::new([0; 32], 0),
+        );
+        let output = TransactionOutput::new(
+            value,
+            receiver.clone(),
+            OutPoint::new([1; 32], 0),
+        );
+
+        let mut transaction_info =
+            Transaction::new(vec![input], vec![output]).unwrap();
+
+        sender_pk.sign_all_owned_inputs_in_transaction(&mut transaction_info);
+
+        transaction_info
+    }
+}
+
+impl Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let inputs: String = self
             .inputs
@@ -52,147 +158,19 @@ impl Display for TransactionInfo {
             .collect::<Vec<String>>()
             .join("::");
 
-        write!(f, "INPUTS::{}:OUTPUTS::{}", inputs, outputs)
+        write!(
+            f,
+            "TXID::{:?}::DATE::{}::INPUTS::{}:OUTPUTS::{}",
+            self.txid, self.date, inputs, outputs
+        )
     }
 }
+
 // -------------------------------------------------------------------------------------------------
 
 // ------------------------------------- Transaction definition ------------------------------------
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Transaction {
-    pub sender: Wallet,
-    pub receiver: Wallet,
-    pub transaction_info: TransactionInfo,
-    pub txid: [u8; 32], // hash
-}
-
-impl PartialEq for Transaction {
-    fn eq(&self, other: &Self) -> bool {
-        self.txid == other.txid
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct TransactionHeader {
-    pub sender: Vec<u8>,
-    pub receiver: Vec<u8>,
     txid: [u8; 32],
-}
-
-// TODO eventually, I want to make the transactions not need to have the sender adress
-impl Transaction {
-    pub fn new(
-        sender: Wallet,
-        receiver: Wallet,
-        transaction_info: TransactionInfo,
-    ) -> Result<Self, TransactionError> {
-        let mut transaction = Self {
-            sender,
-            receiver,
-            transaction_info,
-            txid: [0; 32], // This could be optimized by avoiding the creation of this Vec, which
-                           // serves no function on its own, but I don't really see that being a problem
-        };
-
-        let input_utxos: Vec<UTXO> = transaction
-            .transaction_info
-            .inputs
-            .iter()
-            .map(|input| input.utxo.clone())
-            .collect();
-
-        let output_utxos: Vec<UTXO> = transaction
-            .transaction_info
-            .outputs
-            .iter()
-            .map(|output| output.utxo.clone())
-            .collect();
-
-        let input_sum = UTXO::sum(&input_utxos);
-        let output_sum = UTXO::sum(&output_utxos);
-        let change: i64 = input_sum as i64 - output_sum as i64;
-
-        if change < 0 {
-            return Err(TransactionError::InsufficientInputs);
-        }
-
-        let to_hash = transaction.to_string();
-        let mut hasher: Sha256 = Sha256::new();
-        hasher.update(to_hash.as_bytes());
-        transaction.txid = hasher.finish().to_owned();
-
-        match transaction.verify_signature() {
-            Ok(()) => Ok(transaction),
-            Err(error) => Err(error),
-        }
-    }
-
-    pub fn to_header(&self) -> TransactionHeader {
-        TransactionHeader {
-            sender: self.sender.public_key.public_key_to_pem().unwrap(),
-            receiver: self.receiver.public_key.public_key_to_pem().unwrap(),
-            txid: self.txid,
-        }
-    }
-
-    pub(crate) fn verify_signature(&self) -> Result<(), TransactionError> {
-        match self.sender.verify_transaction_info(&self.transaction_info) {
-            Ok(value) => match value {
-                true => Ok(()),
-                false => Err(TransactionError::ValidationError),
-            },
-            Err(stack) => Err(TransactionError::OpenSSLError(stack)),
-        }
-    }
-
-    pub fn serialize(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap()
-    }
-
-    pub fn check_transaction(
-        tx: &Transaction,
-    ) -> Result<(), TransactionDeserializeError> {
-        let input_sum = UTXO::sum(&tx.transaction_info.inputs);
-        println!("Input sum is {input_sum}");
-        let output_sum = UTXO::sum(&tx.transaction_info.outputs);
-        println!("Output sum is {output_sum}");
-        let change = input_sum as i64 - output_sum as i64;
-
-        if change < 0 {
-            return Err(TransactionDeserializeError::InsufficientFunds);
-        }
-
-        Ok(())
-    }
-}
-
-impl Default for Transaction {
-    fn default() -> Self {
-        let (sender, sender_pk) = Wallet::new();
-        let (receiver, _) = Wallet::new();
-
-        let value: u32 = rand::random();
-
-        let transaction_info = TransactionInfo::new(
-            vec![UTXO::new(value as u64, sender.clone())],
-            vec![UTXO::new(value as u64, receiver.clone())],
-        );
-
-        let signature = sender_pk.sign_transaction(&transaction_info).unwrap();
-        Transaction::new(sender, receiver, transaction_info, signature).unwrap()
-    }
-}
-
-impl Display for Transaction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "SENDER::{:?}::RECEIVER::{:?}::{}::SIGNATURE::{:?}",
-            self.sender,
-            self.receiver.to_pem(),
-            self.transaction_info,
-            self.signature
-        )
-    }
 }

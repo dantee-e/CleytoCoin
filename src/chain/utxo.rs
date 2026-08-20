@@ -1,18 +1,18 @@
+use super::wallet::Wallet;
+use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, fmt::Display};
 
-use serde::{Deserialize, Serialize};
-use sha2::digest::Output;
-
-use super::wallet::Wallet;
-
 pub trait UTXO:
-    Display + for<'de> Deserialize<'de> + Serialize + Clone
+    Display
+    + for<'de> Deserialize<'de>
+    + Serialize
+    + Clone
+    + PartialEq
+    + Eq
+    + Ord
+    + PartialOrd
 {
     fn new(value: u64, owner: Wallet, outpoint: OutPoint) -> Self;
-
-    fn value(&self) -> u64;
-
-    fn owner(&self) -> Wallet;
 
     fn sum<T>(vec: &T) -> u64
     where
@@ -28,6 +28,12 @@ pub struct OutPoint {
     pub index: u32,
 }
 
+impl OutPoint {
+    pub fn new(txid: [u8; 32], index: u32) -> Self {
+        Self { txid, index }
+    }
+}
+
 impl Display for OutPoint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TXID::{:?}::INDEX::{}", self.txid, self.index)
@@ -38,10 +44,17 @@ impl Display for OutPoint {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TransactionInput {
-    signature: Vec<u8>,
-    value: u64,
-    owner: Wallet,
-    outpoint: OutPoint,
+    pub signature: Vec<u8>,
+    pub value: u64,
+    pub owner: Wallet,
+    pub outpoint: OutPoint,
+}
+
+impl TransactionInput {
+    /// Clone of the signature
+    pub fn signature(&self) -> Vec<u8> {
+        self.signature.clone()
+    }
 }
 
 impl UTXO for TransactionInput {
@@ -53,12 +66,7 @@ impl UTXO for TransactionInput {
             outpoint,
         }
     }
-    fn value(&self) -> u64 {
-        self.value
-    }
-    fn owner(&self) -> Wallet {
-        self.owner.clone()
-    }
+
     fn sum<T>(vec: &T) -> u64
     where
         T: IntoIterator<Item = Self>,
@@ -146,12 +154,7 @@ impl UTXO for TransactionOutput {
             outpoint,
         }
     }
-    fn value(&self) -> u64 {
-        self.value
-    }
-    fn owner(&self) -> Wallet {
-        self.owner.clone()
-    }
+
     fn sum<T>(vec: &T) -> u64
     where
         T: IntoIterator<Item = Self>,
