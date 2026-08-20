@@ -123,12 +123,12 @@ impl Default for Transaction {
         let input = TransactionInput::new(
             value,
             sender.clone(),
-            OutPoint::new([0; 32], 0),
+            OutPoint::new(Some([0; 32]), 0),
         );
         let output = TransactionOutput::new(
             value,
             receiver.clone(),
-            OutPoint::new([1; 32], 0),
+            OutPoint::new(Some([1; 32]), 0),
         );
 
         let mut transaction_info =

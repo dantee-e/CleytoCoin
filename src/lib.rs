@@ -1,7 +1,7 @@
 use crate::{
     chain::{
         transaction::{self, Transaction},
-        utxo::UTXO,
+        utxo::{TransactionOutput, UTXO},
         wallet::{Wallet, WalletPK},
         Chain,
     },
@@ -149,27 +149,19 @@ pub async fn send(
 
     // Create output UTXOs
     let input_sum = UTXO::sum(&input_utxos);
-    let recipients_utxo = UTXO::new(amount, recipient_wallet.clone());
+    let recipients_utxo =
+        TransactionOutput::new(amount, recipient_wallet.clone());
     let change_utxo =
         UTXO::new(input_sum - amount, sender_wallet.public_wallet());
     let output_utxos = vec![change_utxo, recipients_utxo];
 
     // create transaction info
-    let transaction_info = Transaction::new(input_utxos, output_utxos);
+    let mut transaction = Transaction::new(input_utxos, output_utxos)?;
 
     // sign the transaction
     let signature = sender_wallet
-        .sign_transaction(&transaction_info)
+        .sign_all_owned_inputs_in_transaction(&mut transaction)
         .expect("Failed on signing of transaction");
-
-    let transaction = Transaction::new(
-        sender_wallet.public_wallet(),
-        recipient_wallet,
-        transaction_info,
-        signature,
-    )
-    .inspect_err(|e| eprintln!("Failed creating the transaction: {e}"))
-    .unwrap();
 
     send_transaction(transaction).await
 }

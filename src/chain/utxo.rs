@@ -18,18 +18,16 @@ pub trait UTXO:
     where
         T: IntoIterator<Item = Self>,
         T: Clone;
-
-    fn outpoint(&self) -> OutPoint;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OutPoint {
-    pub txid: [u8; 32],
+    pub txid: Option<[u8; 32]>,
     pub index: u32,
 }
 
 impl OutPoint {
-    pub fn new(txid: [u8; 32], index: u32) -> Self {
+    pub fn new(txid: Option<[u8; 32]>, index: u32) -> Self {
         Self { txid, index }
     }
 }
@@ -44,17 +42,10 @@ impl Display for OutPoint {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TransactionInput {
-    pub signature: Vec<u8>,
+    pub signature: Option<Vec<u8>>,
     pub value: u64,
     pub owner: Wallet,
     pub outpoint: OutPoint,
-}
-
-impl TransactionInput {
-    /// Clone of the signature
-    pub fn signature(&self) -> Vec<u8> {
-        self.signature.clone()
-    }
 }
 
 impl UTXO for TransactionInput {
@@ -62,7 +53,7 @@ impl UTXO for TransactionInput {
         Self {
             value,
             owner,
-            signature: Vec::new(),
+            signature: None,
             outpoint,
         }
     }
@@ -73,10 +64,6 @@ impl UTXO for TransactionInput {
         T: Clone,
     {
         vec.clone().into_iter().map(|utxo| utxo.value).sum()
-    }
-
-    fn outpoint(&self) -> OutPoint {
-        self.outpoint.clone()
     }
 }
 
@@ -141,9 +128,9 @@ impl Ord for TransactionInput {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TransactionOutput {
-    value: u64,
-    owner: Wallet,
-    outpoint: OutPoint,
+    pub value: u64,
+    pub owner: Wallet,
+    pub outpoint: OutPoint,
 }
 
 impl UTXO for TransactionOutput {
@@ -162,12 +149,10 @@ impl UTXO for TransactionOutput {
     {
         vec.clone().into_iter().map(|utxo| utxo.value).sum()
     }
-    fn outpoint(&self) -> OutPoint {
-        self.outpoint.clone()
-    }
 }
 
 impl Display for TransactionOutput {
+    /// This does not serialize the txid
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let owner_pem = self.owner.to_pem();
         let owner = if let Ok(val) = String::from_utf8(owner_pem) {
@@ -175,7 +160,11 @@ impl Display for TransactionOutput {
         } else {
             panic!("Invalid UTF-8 when getting UTXO owner")
         };
-        write!(f, "VALUE::{}::OWNER::{}", self.value, owner)
+        write!(
+            f,
+            "VALUE::{}::OWNER::{}::INDEX::{}",
+            self.value, owner, self.outpoint.index
+        )
     }
 }
 
@@ -217,5 +206,3 @@ impl Ord for TransactionOutput {
         }
     }
 }
-
-// If you want to use sum for a collection of UTXOs, use the func UTXO::sum()

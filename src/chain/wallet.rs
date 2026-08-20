@@ -1,8 +1,8 @@
 use super::transaction::Transaction;
 use crate::chain::ordered_vector::OrderedVec;
-use crate::chain::utxo::{TransactionInput, UTXO};
+use crate::chain::utxo::{TransactionOutput, UTXO};
 use crate::configs::ConfigPaths;
-use openssl::error::ErrorStack;
+use crate::error_handling::{CleytoResult, TransactionError};
 
 pub use super::wallet_pk::WalletPK;
 use openssl::hash::MessageDigest;
@@ -109,7 +109,7 @@ pub struct Wallet {
         deserialize_with = "deserialize_public_key"
     )]
     pub(crate) public_key: PKey<Public>,
-    pub(crate) available_utxos: Option<OrderedVec<UTXO>>,
+    pub(crate) available_utxos: Option<OrderedVec<TransactionOutput>>,
 }
 
 const MAX_UTXO_SEARCH_DEPTH: usize = 100;
@@ -120,7 +120,7 @@ const MAX_ITERATIONS_NON_EXACT_COIN_SELECTION: u64 = 10_000;
 // Helper for the coin selection algorithms
 #[derive(Clone)]
 struct UtxoEstimate {
-    utxo: UTXO,
+    utxo: TransactionOutput,
     effective_value: u64,
     weight: u64,
 }
@@ -156,7 +156,7 @@ impl Wallet {
     pub fn verify_transaction_info(
         &self,
         transaction_info: &Transaction,
-    ) -> Result<bool, ErrorStack> {
+    ) -> CleytoResult<bool> {
         for input in &transaction_info.inputs {
             let mut verifier =
                 Verifier::new(MessageDigest::sha256(), &self.public_key)?;
@@ -164,8 +164,16 @@ impl Wallet {
                 &transaction_info.get_ordered_bytes_for_signing(&input),
             )?;
 
-            if !verifier.verify(&input.signature)? {
-                return Ok(false);
+            if let Some(signature) = &input.signature {
+                if !verifier.verify(signature)? {
+                    return Ok(false);
+                }
+            } else {
+                return Err(
+                    crate::error_handling::CleytonError::TransactionError(
+                        TransactionError::UnsignedInput,
+                    ),
+                );
             }
         }
         Ok(true)
@@ -180,12 +188,12 @@ impl Wallet {
 
     /// Rough fee estimate per UTXO – replace with a real estimator later.
     // TODO
-    fn estimate_fee_per_utxo(_utxo: TransactionInput) -> u64 {
+    fn estimate_fee_per_utxo(_utxo: &TransactionOutput) -> u64 {
         100
     }
 
     /// Insert a batch of new UTXOs, keeping the internal ordering intact.
-    pub fn add_utxos(&mut self, new_vec: Vec<impl UTXO>) {
+    pub fn add_utxos(&mut self, new_vec: Vec<TransactionOutput>) {
         match &mut self.available_utxos {
             Some(ord_vec) => {
                 for utxo in new_vec {
@@ -224,7 +232,7 @@ impl Wallet {
     pub fn get_utxos(
         &self,
         amount: u64,
-    ) -> Result<Vec<TransactionInput>, WalletError> {
+    ) -> Result<Vec<TransactionOutput>, WalletError> {
         let utxos = self
             .available_utxos
             .as_ref()
@@ -238,7 +246,7 @@ impl Wallet {
 
         // exact‑match exit
         if let Some(single) =
-            utxos.clone().into_iter().find(|u| u.value() == amount)
+            utxos.clone().into_iter().find(|u| u.value == amount)
         {
             return Ok(vec![single.clone()]);
         }
@@ -247,7 +255,7 @@ impl Wallet {
         let first_over_idx = utxos
             .clone()
             .into_iter()
-            .position(|u| u.value() < amount)
+            .position(|u| u.value < amount)
             .unwrap_or(0);
 
         // Branch‑and‑bound selection on the remaining (smaller) UTXOs.
@@ -259,10 +267,10 @@ impl Wallet {
         let estimates: Vec<UtxoEstimate> = smaller_utxos
             .iter()
             .map(|u| {
-                total_sum += u.value();
+                total_sum += u.value;
                 UtxoEstimate {
                     utxo: u.clone(),
-                    effective_value: u.value() - Self::estimate_fee_per_utxo(u),
+                    effective_value: u.value - Self::estimate_fee_per_utxo(u),
                     weight: UTXO_WEIGHT,
                 }
             })
@@ -322,7 +330,7 @@ impl Wallet {
         dust_threshold: u64,
         max_reps: usize,
         total_sum: u64,
-    ) -> (Vec<UTXO>, u64) {
+    ) -> (Vec<TransactionOutput>, u64) {
         // Transform each UTXO into an enriched struct that carries an estimated
         // “effective value” (value minus fee) and its weight.
 
@@ -447,9 +455,9 @@ impl Wallet {
     }
 
     fn dantes_crazy_algorithm_entrypoint(
-        slice: &[UTXO],
+        slice: &[TransactionOutput],
         target: u64,
-    ) -> Vec<UTXO> {
+    ) -> Vec<TransactionOutput> {
         let mut solution: Vec<UtxoEstimate> = Vec::new();
         let mut solution_waste = u64::MAX;
 
@@ -457,7 +465,7 @@ impl Wallet {
             .iter()
             .map(|utxo| UtxoEstimate {
                 utxo: utxo.clone(),
-                effective_value: utxo.value()
+                effective_value: utxo.value
                     - Wallet::estimate_fee_per_utxo(utxo),
                 weight: UTXO_WEIGHT,
             })
@@ -502,7 +510,7 @@ impl Wallet {
             Some(_) => vec![slice[middle_index].clone()],
             None => return,
         };
-        sum += slice[middle_index].utxo.value();
+        sum += slice[middle_index].utxo.value;
 
         if number_of_iterations == -1 {
             println!("number_of_iterations is still {number_of_iterations}");
@@ -524,7 +532,7 @@ impl Wallet {
             };
 
             if let Some(x) = slice.get(index) {
-                sum += x.utxo.value();
+                sum += x.utxo.value;
                 elements.push(x.clone());
                 // println!(
                 //     "Pushing {} to sum {} on position {position} with target {target}",

@@ -35,7 +35,7 @@ impl WalletPK {
         let signature = signer.sign_oneshot_to_vec(
             &transaction_info.get_ordered_bytes_for_signing(input),
         )?;
-        input.signature = signature;
+        input.signature = Some(signature);
         Ok(())
     }
 

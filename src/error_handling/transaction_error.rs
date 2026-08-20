@@ -30,6 +30,7 @@ pub enum TransactionError {
     OpenSSLError(ErrorStack),
     InsufficientInputs,
     ValidationError,
+    UnsignedInput,
     InsufficientFunds,
     ConnectionError(String),
 }
@@ -70,6 +71,12 @@ impl fmt::Display for TransactionError {
                     f,
                     "The transaction was not sent to the server due to a connection error."
                 )
+            }
+            TransactionError::UnsignedInput => {
+                write!(
+                            f,
+                            "It wasn't possible to validate the transaction due to a missing signature for one of the inputs"
+                        )
             }
         }
     }
