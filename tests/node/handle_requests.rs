@@ -4,13 +4,11 @@ mod handle_connection_tests {
     use std::sync::Mutex;
 
     use super::super::super::mock_stream::{request, send_data};
+    use cleyto_coin::chain::utxo::TransactionInput;
+    use cleyto_coin::chain::utxo::TransactionOutput;
     use cleyto_coin::node::Message;
     use cleyto_coin::{
-        chain::{
-            transaction::{Transaction},
-            utxo::UTXO,
-            wallet::Wallet,
-        },
+        chain::{transaction::Transaction, wallet::Wallet},
         node::NodeState,
     };
 
@@ -25,12 +23,15 @@ mod handle_connection_tests {
     fn test_transaction() -> Transaction {
         let sender = Wallet::new();
         let receiver = Wallet::new();
-        let inputs = vec![UTXO::new(1000, sender.0.clone())];
-        let outputs = vec![UTXO::new(1000, receiver.0.clone())];
-        let info = Transaction::new(inputs, outputs);
-        let signature = sender.1.sign_transaction(&info).unwrap();
-        Transaction::new(sender.0.clone(), receiver.0.clone(), info, signature)
-            .unwrap()
+        let inputs = vec![TransactionInput::new(1000, sender.0.clone())];
+        let outputs = vec![TransactionOutput::new(1000, receiver.0.clone())];
+        let mut transaction = Transaction::new(inputs, outputs).unwrap();
+        sender
+            .1
+            .sign_all_owned_inputs_in_transaction(&mut transaction)
+            .unwrap();
+
+        transaction
     }
 
     // --- Happy path: known endpoints -----------------------------------
@@ -202,11 +203,22 @@ mod handle_connection_tests {
         // signature validity before accepting into the pool.
         let mut tx = test_transaction();
         let bogus = Wallet::new();
-        let bogus_info = Transaction::new(
-            vec![UTXO::new(1, bogus.0.clone())],
-            vec![UTXO::new(1, bogus.0.clone())],
-        );
-        tx.signature = bogus.1.sign_transaction(&bogus_info).unwrap();
+        let mut bogus_info = Transaction::new(
+            vec![TransactionInput::new(1, bogus.0.clone())],
+            vec![TransactionOutput::new(1, bogus.0.clone())],
+        )
+        .unwrap();
+        bogus
+            .1
+            .sign_all_owned_inputs_in_transaction(&mut bogus_info)
+            .unwrap();
+
+        let signature = bogus_info.inputs.first().unwrap().signature.clone();
+
+        tx.inputs
+            .iter_mut()
+            .for_each(|i| i.signature = signature.clone());
+
         let message = Message::Transaction(tx);
         let body = serde_json::to_string(&message).unwrap();
         let result =

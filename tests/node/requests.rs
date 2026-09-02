@@ -1,5 +1,5 @@
-use cleyto_coin::chain::transaction::{Transaction};
-use cleyto_coin::chain::utxo::UTXO;
+use cleyto_coin::chain::transaction::Transaction;
+use cleyto_coin::chain::utxo::{TransactionInput, TransactionOutput};
 use cleyto_coin::chain::wallet::Wallet;
 use cleyto_coin::{kill_node, run_server_thread};
 use std::thread;
@@ -16,24 +16,20 @@ fn thread_post(n: u16) {
     let (wallet2, _) = Wallet::new();
 
     let input_utxos = vec![
-        UTXO::new(1000, wallet1.clone()),
-        UTXO::new(2000, wallet1.clone()),
+        TransactionInput::new(1000, wallet1.clone()),
+        TransactionInput::new(2000, wallet1.clone()),
     ];
     let output_utxos = vec![
-        UTXO::new(2500, wallet2.clone()),
-        UTXO::new(500, wallet2.clone()),
+        TransactionOutput::new(2500, wallet2.clone()),
+        TransactionOutput::new(500, wallet2.clone()),
     ];
-    let transaction_info: Transaction =
-        Transaction::new(input_utxos, output_utxos);
+    let mut new_transaction: Transaction =
+        Transaction::new(input_utxos, output_utxos).unwrap();
 
-    let signature = match wallet1_pk.sign_transaction(&transaction_info) {
-        Ok(value) => value,
-        Err(e) => panic!("Error creating signed message: {e}"),
-    };
+    wallet1_pk
+        .sign_all_owned_inputs_in_transaction(&mut new_transaction)
+        .unwrap();
 
-    let new_transaction =
-        Transaction::new(wallet1, wallet2, transaction_info, signature)
-            .unwrap();
     let json_transaction = new_transaction.serialize();
     println!("json_transaction is:\n{}", json_transaction);
 

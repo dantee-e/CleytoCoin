@@ -1,7 +1,7 @@
 use cleyto_coin::chain::{
     block::Block,
-    transaction::{Transaction},
-    utxo::UTXO,
+    transaction::Transaction,
+    utxo::{TransactionInput, TransactionOutput},
     wallet::Wallet,
     Chain,
 };
@@ -12,28 +12,25 @@ fn create_block_and_add_chain() {
     let (wallet2, _) = Wallet::new();
 
     let input_utxos = vec![
-        UTXO::new(1000, wallet1.clone()),
-        UTXO::new(2000, wallet1.clone()),
+        TransactionInput::new(1000, wallet1.clone()),
+        TransactionInput::new(2000, wallet1.clone()),
     ];
     let output_utxos = vec![
-        UTXO::new(2500, wallet2.clone()),
-        UTXO::new(500, wallet2.clone()),
+        TransactionOutput::new(2500, wallet2.clone()),
+        TransactionOutput::new(500, wallet2.clone()),
     ];
-    let transaction_info: Transaction =
-        Transaction::new(input_utxos, output_utxos);
+    let mut transaction: Transaction =
+        Transaction::new(input_utxos, output_utxos).unwrap();
 
-    let signature = match wallet1_pk.sign_transaction(&transaction_info) {
-        Ok(value) => value,
-        Err(e) => panic!("Error creating signed message: {e}"),
-    };
+    wallet1_pk
+        .sign_all_owned_inputs_in_transaction(&mut transaction)
+        .unwrap();
 
-    let new_transaction =
-        Transaction::new(wallet1, wallet2, transaction_info, signature)
-            .unwrap();
+    transaction.verify_signatures().unwrap();
 
     let mut chain = Chain::new(Wallet::null_wallet(), vec![]);
 
-    let block = Block::new(&mut chain, vec![new_transaction]);
+    let block = Block::new(&mut chain, vec![transaction]);
 
     chain.add_block(block);
 }

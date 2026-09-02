@@ -161,7 +161,7 @@ impl Wallet {
             let mut verifier =
                 Verifier::new(MessageDigest::sha256(), &self.public_key)?;
             verifier.update(
-                &transaction_info.get_ordered_bytes_for_signing(&input),
+                &transaction_info.get_ordered_bytes_for_signing(input),
             )?;
 
             if let Some(signature) = &input.signature {
@@ -241,7 +241,7 @@ impl Wallet {
             .clone();
 
         // If the total balance is insufficient stop
-        if UTXO::sum(&utxos) < amount {
+        if TransactionOutput::sum(&utxos) < amount {
             return Err(WalletError::InsufficientFunds);
         }
 
@@ -289,7 +289,7 @@ impl Wallet {
             .map(|output| output.into())
             .collect::<Vec<TransactionInput>>();
 
-        if !bnb_solution.is_empty() {
+        if !bnb_solution_as_inputs.is_empty() {
             return Ok(bnb_solution_as_inputs);
         } else {
             println!("bnb solution is empty");
@@ -444,7 +444,7 @@ impl Wallet {
 
         // Strip the auxiliary data and return plain UTXOs.
         let selected = best_set.into_iter().map(|e| e.utxo).collect::<Vec<_>>();
-        let total_selected = UTXO::sum(&selected);
+        let total_selected = TransactionOutput::sum(&selected);
         (selected, total_selected)
     }
 

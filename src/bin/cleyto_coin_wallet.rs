@@ -92,7 +92,7 @@ async fn main() {
             {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("Error {e} when sending transaction to server")
+                    println!("Error {:?} when sending transaction to server", e)
                 }
             }
         }

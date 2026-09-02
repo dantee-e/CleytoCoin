@@ -1,36 +1,39 @@
-use cleyto_coin::chain::{utxo::UTXO, wallet::Wallet};
+use cleyto_coin::chain::{
+    utxo::{TransactionInput, TransactionOutput},
+    wallet::Wallet,
+};
 
 #[test]
 fn test_get_utxo_wallet() {
     let (mut wallet1, _) = Wallet::new();
 
-    let input_utxos = vec![
+    let utxos = vec![
         // Large UTXOs - good for covering big amounts efficiently
-        UTXO::new(50000, wallet1.clone()),
-        UTXO::new(25000, wallet1.clone()),
+        TransactionOutput::new(50000, wallet1.clone()),
+        TransactionOutput::new(25000, wallet1.clone()),
         // Medium UTXOs - typical transaction amounts
-        UTXO::new(10000, wallet1.clone()),
-        UTXO::new(5000, wallet1.clone()),
+        TransactionOutput::new(10000, wallet1.clone()),
+        TransactionOutput::new(5000, wallet1.clone()),
         // Small UTXOs - test efficiency vs dust management
-        UTXO::new(3000, wallet1.clone()),
-        UTXO::new(1200, wallet1.clone()),
-        UTXO::new(1000, wallet1.clone()),
+        TransactionOutput::new(3000, wallet1.clone()),
+        TransactionOutput::new(1200, wallet1.clone()),
+        TransactionOutput::new(1000, wallet1.clone()),
         // Very small UTXOs - potential dust scenarios
-        UTXO::new(300, wallet1.clone()),
+        TransactionOutput::new(300, wallet1.clone()),
     ];
 
-    fn print_utxo_vec(input_utxos: Vec<UTXO>) {
+    fn print_utxo_vec(input_utxos: Vec<TransactionInput>) {
         for utxo in input_utxos {
-            println!("utxo: ({})", utxo.value());
+            println!("utxo: ({})", utxo.value);
         }
     }
 
-    wallet1.add_utxos(input_utxos);
+    wallet1.add_utxos(utxos);
     println!("Checkpoint 1");
 
     assert_eq!(
         wallet1.get_utxos(50000).unwrap(),
-        vec![UTXO::new(50000, wallet1.clone())]
+        vec![TransactionInput::new(50000, wallet1.clone())]
     );
     println!("Checkpoint 2");
 

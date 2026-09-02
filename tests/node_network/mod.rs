@@ -1,7 +1,7 @@
 use cleyto_coin::{
     chain::{
-        transaction::{Transaction},
-        utxo::UTXO,
+        transaction::Transaction,
+        utxo::TransactionOutput,
         wallet::{Wallet, WalletPK},
         Chain,
     },
@@ -14,7 +14,7 @@ fn create_multiple_nodes(n: usize) -> (Vec<Node>, Wallet, WalletPK) {
     let first_receiver = Wallet::new();
     let chain = Chain::new(
         first_receiver.0.clone(),
-        vec![UTXO::new(1000, first_receiver.0.clone())],
+        vec![TransactionOutput::new(1000, first_receiver.0.clone())],
     );
     (
         (0..n)
@@ -44,16 +44,18 @@ async fn use_multiple_nodes() {
         println!("UTXO = {}", i);
     }
 
-    let transaction_info = Transaction::new(
+    let mut transaction = Transaction::new(
         input_utxos,
-        vec![UTXO::new(200, wallet1.0.clone()), UTXO::new(200, wallet2.0)],
-    );
+        vec![
+            TransactionOutput::new(200, wallet1.0.clone()),
+            TransactionOutput::new(200, wallet2.0),
+        ],
+    )
+    .unwrap();
 
-    let signature = fr_wallet_pk.sign_transaction(&transaction_info).unwrap();
-
-    let transaction =
-        Transaction::new(fr_wallet, wallet1.0, transaction_info, signature)
-            .unwrap();
+    fr_wallet_pk
+        .sign_all_owned_inputs_in_transaction(&mut transaction)
+        .unwrap();
 
     let message_str =
         serde_json::to_string(&Message::Transaction(transaction)).unwrap();

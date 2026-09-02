@@ -1,7 +1,7 @@
 use crate::{
     chain::{
         transaction::{self, Transaction},
-        utxo::{TransactionOutput, UTXO},
+        utxo::{TransactionInput, TransactionOutput},
         wallet::{Wallet, WalletPK},
         Chain,
     },
@@ -31,7 +31,7 @@ pub use configs::{
 
 async fn send_transaction(
     transaction: transaction::Transaction,
-) -> Result<(), TransactionError> {
+) -> CleytoResult<()> {
     let client = Client::new();
 
     let transaction_json = transaction.serialize();
@@ -51,9 +51,11 @@ async fn send_transaction(
     match status {
         StatusCode::OK => Ok(()),
 
-        _ => Err(TransactionError::ConnectionError(format!(
-            "Error: {status}\n{response_body}"
-        ))),
+        _ => Err(CleytonError::TransactionError(
+            TransactionError::ConnectionError(format!(
+                "Error: {status}\n{response_body}"
+            )),
+        )),
     }
 }
 
@@ -149,18 +151,20 @@ pub async fn send(
         };
 
     // Create output UTXOs
-    let input_sum = UTXO::sum(&input_utxos);
+    let input_sum = TransactionInput::sum(&input_utxos);
     let recipients_utxo =
         TransactionOutput::new(amount, recipient_wallet.clone());
-    let change_utxo =
-        UTXO::new(input_sum - amount, sender_wallet.public_wallet());
+    let change_utxo = TransactionOutput::new(
+        input_sum - amount,
+        sender_wallet.public_wallet(),
+    );
     let output_utxos = vec![change_utxo, recipients_utxo];
 
     // create transaction
     let mut transaction = Transaction::new(input_utxos, output_utxos)?;
 
     // sign the transaction
-    let signature = sender_wallet
+    sender_wallet
         .sign_all_owned_inputs_in_transaction(&mut transaction)
         .expect("Failed on signing of transaction");
 

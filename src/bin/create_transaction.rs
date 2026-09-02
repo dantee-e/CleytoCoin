@@ -1,5 +1,5 @@
-use cleyto_coin::chain::transaction::{Transaction};
-use cleyto_coin::chain::utxo::UTXO;
+use cleyto_coin::chain::transaction::Transaction;
+use cleyto_coin::chain::utxo::{TransactionInput, TransactionOutput};
 use cleyto_coin::chain::wallet::Wallet;
 use reqwest::Client;
 use std::error::Error;
@@ -35,32 +35,22 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
     let (wallet_receiver, _) = Wallet::new();
 
     let input_utxos = vec![
-        UTXO::new(1000, wallet_sender.clone()),
-        UTXO::new(2000, wallet_sender.clone()),
+        TransactionInput::new(1000, wallet_sender.clone()),
+        TransactionInput::new(2000, wallet_sender.clone()),
     ];
     let output_utxos = vec![
-        UTXO::new(2500, wallet_receiver.clone()),
-        UTXO::new(500, wallet_sender.clone()),
+        TransactionOutput::new(2500, wallet_receiver.clone()),
+        TransactionOutput::new(500, wallet_sender.clone()),
     ];
-    let transactioninfo: Transaction =
-        Transaction::new(input_utxos, output_utxos);
+    let mut transaction: Transaction =
+        Transaction::new(input_utxos, output_utxos).unwrap();
 
-    let signature = match walletpk_sender.sign_transaction(&transactioninfo) {
+    match walletpk_sender.sign_all_owned_inputs_in_transaction(&mut transaction)
+    {
         Ok(signed_hashed_message) => signed_hashed_message,
         _ => panic!("error while signing transaction"),
     };
-    println!(
-        "Transaction signature (signed using the wallet_pk):\n{:?}",
-        signature
-    );
 
-    let transaction: Transaction = Transaction::new(
-        wallet_sender,
-        wallet_receiver,
-        transactioninfo,
-        signature,
-    )
-    .unwrap();
     let transaction_json = transaction.serialize();
 
     // Send the POST request

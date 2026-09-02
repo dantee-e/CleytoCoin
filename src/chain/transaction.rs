@@ -1,4 +1,3 @@
-use super::utxo::UTXO;
 use super::wallet::Wallet;
 use crate::chain::ordered_vector::OrderedVec;
 use crate::chain::utxo::TransactionInput;
@@ -32,8 +31,7 @@ impl Transaction {
 
         let mut bytes2: Vec<u8> = OrderedVec::from(self.outputs.clone())
             .into_iter()
-            .map(|output| output.to_string().into_bytes())
-            .flatten()
+            .flat_map(|output| output.to_string().into_bytes())
             .collect();
 
         bytes.append(&mut bytes2);
@@ -45,12 +43,12 @@ impl Transaction {
         mut outputs: Vec<TransactionOutput>,
     ) -> CleytoResult<Self> {
         let input_sum = TransactionInput::sum(&inputs);
-        let output_sum = UTXO::sum(&outputs);
+        let output_sum = TransactionOutput::sum(&outputs);
 
         let change: i64 = input_sum as i64 - output_sum as i64;
 
         if change < 0 {
-            return Err(TransactionError::InsufficientInputs)?;
+            Err(TransactionError::InsufficientInputs)?
         }
 
         for (i, output) in outputs.iter_mut().enumerate() {
@@ -69,20 +67,20 @@ impl Transaction {
         hasher.update(to_hash.as_bytes());
         transaction.txid = hasher.finish().to_owned();
 
-        match transaction.verify_signatures() {
-            Ok(()) => Ok(transaction),
-            Err(error) => Err(error)?,
-        }
+        Ok(transaction)
     }
 
     pub fn to_header(&self) -> TransactionHeader {
         TransactionHeader { txid: self.txid }
     }
 
-    pub(crate) fn verify_signatures(&self) -> CleytoResult<()> {
+    pub fn verify_signatures(&self) -> CleytoResult<()> {
+        let i = 0;
         for input in &self.inputs {
+            println!("i = {i}");
             if !input.owner.verify_transaction_info(self)? {
-                return Err(TransactionError::ValidationError)?;
+                println!("on error i = {i}");
+                Err(TransactionError::ValidationError)?
             }
         }
 
@@ -96,9 +94,9 @@ impl Transaction {
     pub fn check_sufficient_funds(
         tx: &Transaction,
     ) -> Result<(), TransactionDeserializeError> {
-        let input_sum = UTXO::sum(&tx.inputs);
+        let input_sum = TransactionInput::sum(&tx.inputs);
         println!("Input sum is {input_sum}");
-        let output_sum = UTXO::sum(&tx.outputs);
+        let output_sum = TransactionOutput::sum(&tx.outputs);
         println!("Output sum is {output_sum}");
         let change = input_sum as i64 - output_sum as i64;
 
@@ -129,7 +127,9 @@ impl Default for Transaction {
         let mut transaction_info =
             Transaction::new(vec![input], vec![output]).unwrap();
 
-        sender_pk.sign_all_owned_inputs_in_transaction(&mut transaction_info);
+        sender_pk
+            .sign_all_owned_inputs_in_transaction(&mut transaction_info)
+            .unwrap();
 
         transaction_info
     }

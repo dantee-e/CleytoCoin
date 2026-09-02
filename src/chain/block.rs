@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::utils::PROOF_OF_WORK_DIFFICULTY;
 use super::Chain;
 use crate::chain::transaction::Transaction;
-use crate::chain::utxo::{OutPoint, TransactionInput, TransactionOutput, UTXO};
+use crate::chain::utxo::{TransactionInput, TransactionOutput};
 use crate::chain::wallet::Wallet;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -184,11 +184,7 @@ impl Block {
         let transaction_inputs: Vec<TransactionInput> = utxo_original
             .iter()
             .map(|output| {
-                TransactionInput::new(
-                    output.value,
-                    first_receiver.clone(),
-                    OutPoint::new([0; 32], output.outpoint.index),
-                )
+                TransactionInput::new(output.value, first_receiver.clone())
             })
             .collect();
 
@@ -197,7 +193,8 @@ impl Block {
 
         original_wallet
             .1
-            .sign_all_owned_inputs_in_transaction(&mut transaction);
+            .sign_all_owned_inputs_in_transaction(&mut transaction)
+            .unwrap();
 
         let merkle_root = Block::calculate_merkle_root(&[transaction]);
         Self {
