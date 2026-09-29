@@ -105,18 +105,8 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
             }
         },
         Message::Transaction(transaction) => {
-            let transaction_pool =
-                &mut state.lock().unwrap().transactions_pool.clone();
-            let connected_nodes =
-                &state.lock().unwrap().connected_nodes.clone();
-
             // TODO eventually add the source
-            process_new_transaction(
-                transaction,
-                transaction_pool,
-                connected_nodes,
-                None,
-            )
+            process_new_transaction(transaction, None, state)
         }
     }
 }

@@ -12,7 +12,7 @@ use crate::chain::wallet::Wallet;
 pub struct Block {
     version: u8,
     previous_hash: String,
-    transactions: Vec<Transaction>,
+    pub(crate) transactions: Vec<Transaction>,
     index: u64,
     timestamp: DateTime<Utc>,
     hash: String,

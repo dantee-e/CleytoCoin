@@ -595,6 +595,15 @@ impl Wallet {
             position * 2 + 1,
         );
     }
+    pub fn remove_utxo(&mut self, spent: &TransactionInput) {
+        if let Some(ord_vec) = &mut self.available_utxos {
+            ord_vec.retain(|u| {
+                u.value != spent.value
+                    || u.owner != spent.owner
+                    || u.index != spent.index
+            });
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------------------------------------------

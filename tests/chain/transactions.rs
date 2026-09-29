@@ -69,21 +69,13 @@ fn sign_and_verify_transaction_info() {
     let mut transaction_info: Transaction =
         Transaction::new(input_utxos, output_utxos).unwrap();
 
-    let signature = match wallet_pk
-        .sign_all_owned_inputs_in_transaction(&mut transaction_info)
+    match wallet_pk.sign_all_owned_inputs_in_transaction(&mut transaction_info)
     {
         Ok(signed_hashed_message) => signed_hashed_message,
         _ => panic!("error while signing transaction"),
     };
-    println!(
-        "Transaction signature (signed using the wallet_pk):\n{:?}",
-        signature
-    );
 
-    match transaction_info.verify_signatures() {
-        Ok(()) => println!("transaction verified (by the wallet)"),
-        Err(_) => println!("transaction not verified"),
-    }
+    transaction_info.verify_signatures().unwrap()
 }
 
 #[test]

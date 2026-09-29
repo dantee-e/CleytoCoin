@@ -27,14 +27,37 @@ impl Transaction {
         &self,
         input: &TransactionInput,
     ) -> Vec<u8> {
-        let mut bytes = input.to_string().into_bytes();
+        // Length-prefix each piece so different transactions can never
+        // produce the same byte stream by shifting boundaries.
+        fn push_field(bytes: &mut Vec<u8>, field: &[u8]) {
+            bytes.extend((field.len() as u64).to_be_bytes());
+            bytes.extend(field);
+        }
 
-        let mut bytes2: Vec<u8> = OrderedVec::from(self.outputs.clone())
+        let mut bytes: Vec<u8> = Vec::new();
+
+        push_field(&mut bytes, input.to_string().as_bytes());
+
+        let mut all_inputs: Vec<String> =
+            self.inputs.iter().map(|i| i.to_string()).collect();
+        all_inputs.sort();
+
+        bytes.extend((all_inputs.len() as u64).to_be_bytes());
+        for s in &all_inputs {
+            push_field(&mut bytes, s.as_bytes());
+        }
+
+        // 3. All outputs, in your existing deterministic order
+        let outputs: Vec<String> = OrderedVec::from(self.outputs.clone())
             .into_iter()
-            .flat_map(|output| output.to_string().into_bytes())
+            .map(|output| output.to_string())
             .collect();
 
-        bytes.append(&mut bytes2);
+        bytes.extend((outputs.len() as u64).to_be_bytes());
+        for s in &outputs {
+            push_field(&mut bytes, s.as_bytes());
+        }
+
         bytes
     }
 
@@ -78,6 +101,7 @@ impl Transaction {
         let i = 0;
         for input in &self.inputs {
             println!("i = {i}");
+            println!("input is {}", input);
             if !input.owner.verify_transaction_info(self)? {
                 println!("on error i = {i}");
                 Err(TransactionError::ValidationError)?

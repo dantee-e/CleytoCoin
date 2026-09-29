@@ -1,9 +1,10 @@
-use std::collections::HashSet;
-
-use serde_json::json;
-
 use crate::{
-    chain::{block::Block, transaction::Transaction, Chain},
+    chain::{
+        block::Block,
+        transaction::Transaction,
+        utxo::{TransactionInput, TransactionOutput},
+        Chain,
+    },
     error_handling::{
         CleytonError, TransactionDeserializeError, TransactionError,
     },
@@ -15,8 +16,13 @@ use crate::{
             messages::send::{notify_new_block, notify_new_transaction},
             methods::{Content, HTTPResponse},
         },
-        ConnectedNodeInfo,
+        ConnectedNodeInfo, NodeState,
     },
+};
+use serde_json::json;
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
 };
 
 pub fn process_new_block(
@@ -39,11 +45,13 @@ pub fn process_new_block(
 
 pub fn process_new_transaction(
     transaction: Transaction,
-    transaction_pool: &mut Vec<Transaction>,
-    connected_nodes: &HashSet<ConnectedNodeInfo>,
     source: Option<&[u8]>,
+    state: Arc<Mutex<NodeState>>,
 ) -> HTTPResult {
-    println!("Inside process_new_transaction");
+    let transaction_pool = &mut state.lock().unwrap().transactions_pool.clone();
+    let connected_nodes = &state.lock().unwrap().connected_nodes.clone();
+    let wallets = &state.lock().unwrap().chain.wallets.clone();
+
     if transaction_pool.contains(&transaction) {
         return Ok(HTTPResponse::OK(None));
     }
@@ -87,6 +95,55 @@ pub fn process_new_transaction(
         }
     }
 
+    // check if the wallets have the utxos that they claim to have
+    let mut seen: Vec<(_, _)> = Vec::new();
+
+    for input in transaction.inputs.iter() {
+        let key = (input.txid, input.index);
+        if seen.contains(&key) {
+            return Err(HTTPResponseError::InvalidBody(Some(String::from(
+                "Duplicate input in transaction",
+            ))));
+        }
+        seen.push(key);
+
+        println!("Wallets length is {}", wallets.len());
+        for wallet in wallets.iter() {
+            println!(
+                "Wallet is {:#?}",
+                wallet.public_key.public_key_to_pem().unwrap()
+            );
+        }
+
+        let wallet =
+            wallets.iter().find(|w| **w == input.owner).ok_or_else(|| {
+                HTTPResponseError::InvalidBody(Some(String::from(
+                    "Wallet owning the input not found",
+                )))
+            })?;
+
+        let utxos = wallet.available_utxos.as_ref().ok_or_else(|| {
+            HTTPResponseError::InvalidBody(Some(String::from(
+                "Wallet has no available UTXOs",
+            )))
+        })?;
+
+        let utxo = utxos
+            .iter()
+            .find(|u| u.txid == input.txid && u.index == input.index)
+            .ok_or_else(|| {
+                HTTPResponseError::InvalidBody(Some(String::from(
+                    "UTXO not found in wallet",
+                )))
+            })?;
+
+        // The claimed data must match the real UTXO
+        if utxo.value != input.value || utxo.owner != input.owner {
+            return Err(HTTPResponseError::InvalidBody(Some(String::from(
+                "Input does not match the UTXO it references",
+            ))));
+        }
+    }
     notify_new_transaction(&transaction, connected_nodes, source);
     transaction_pool.push(transaction);
 

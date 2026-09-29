@@ -49,6 +49,10 @@ impl TransactionInput {
     {
         vec.clone().into_iter().map(|utxo| utxo.value).sum()
     }
+
+    pub fn from_outputs(outputs: Vec<TransactionOutput>) -> Vec<Self> {
+        outputs.into_iter().map(Self::from).collect()
+    }
 }
 
 impl From<TransactionOutput> for TransactionInput {
@@ -71,11 +75,7 @@ impl Display for TransactionInput {
         } else {
             panic!("Invalid UTF-8 when getting UTXO owner")
         };
-        write!(
-            f,
-            "VALUE::{}::OWNER::{}::SIGNATURE::{:?}",
-            self.value, owner, self.signature
-        )
+        write!(f, "VALUE::{}::OWNER::{}", self.value, owner)
     }
 }
 

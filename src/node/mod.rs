@@ -44,13 +44,10 @@ pub struct ConnectedNodeInfo {
 
 #[derive(Serialize, Deserialize)]
 pub struct NodeState {
-    status: bool,
-    chain: Chain,
-    transactions_pool: Vec<Transaction>,
-    /*
-     TODO make a better implementation of that
-    */
-    connected_nodes: HashSet<ConnectedNodeInfo>, // very naive way to do it, I'll just store the public keys
+    pub status: bool,
+    pub chain: Chain,
+    pub transactions_pool: Vec<Transaction>,
+    pub connected_nodes: HashSet<ConnectedNodeInfo>,
 }
 impl Default for NodeState {
     fn default() -> Self {

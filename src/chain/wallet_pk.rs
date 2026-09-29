@@ -15,15 +15,6 @@ pub struct WalletPK {
 }
 
 impl WalletPK {
-    // pub fn sign_transaction(
-    //     &self,
-    //     transaction_info: &TransactionInfo,
-    // ) -> Result<Vec<u8>, ErrorStack> {
-    //     let mut signer =
-    //         Signer::new(MessageDigest::sha256(), &self.private_key)?;
-    //     signer.sign_oneshot_to_vec(transaction_info.to_string().as_bytes())
-    // }
-
     /// Signs input inplace
     pub fn sign_input(
         &self,

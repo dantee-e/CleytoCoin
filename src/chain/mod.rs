@@ -5,6 +5,7 @@ pub mod utils;
 pub mod utxo;
 pub mod wallet;
 mod wallet_pk;
+
 use block::Block;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,7 @@ use crate::chain::{
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Chain {
     pub blocks: Vec<block::Block>,
+    pub wallets: Vec<Wallet>,
 }
 
 impl Chain {
@@ -22,13 +24,46 @@ impl Chain {
         first_receiver: Wallet,
         utxo_original: Vec<TransactionOutput>,
     ) -> Self {
-        let mut chain = Self { blocks: Vec::new() };
+        let mut chain = Self {
+            blocks: Vec::new(),
+            wallets: Vec::new(),
+        };
         chain.create_genesis_block(first_receiver, utxo_original);
         chain
     }
 
+    fn register_block_wallets(&mut self, block: &Block) {
+        println!("Registering block");
+        for tx in block.transactions.clone() {
+            // <- exact accessor TBD
+            // Outputs: this owner now has a new spendable UTXO.
+            for output in &tx.outputs {
+                println!("output");
+                match self.wallets.iter_mut().find(|w| *w == &output.owner) {
+                    Some(existing) => existing.add_utxos(vec![output.clone()]),
+                    None => {
+                        let mut w = output.owner.clone();
+                        w.add_utxos(vec![output.clone()]);
+                        println!("Registering wallet");
+                        self.wallets.push(w);
+                    }
+                }
+            }
+            // Inputs: the referenced UTXO is now spent, so remove it from
+            // the owner's available set.
+            for input in &tx.inputs {
+                if let Some(owner) =
+                    self.wallets.iter_mut().find(|w| *w == &input.owner)
+                {
+                    owner.remove_utxo(input); // <- needs to exist, see below
+                }
+            }
+        }
+    }
+
     /// Adds block without checking anything
     pub fn add_block(&mut self, block: Block) {
+        self.register_block_wallets(&block);
         self.blocks.push(block);
     }
 

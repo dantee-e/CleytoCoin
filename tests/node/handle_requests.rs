@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod handle_connection_tests {
+    use std::collections::HashSet;
     use std::sync::Arc;
     use std::sync::Mutex;
 
     use super::super::super::mock_stream::{request, send_data};
     use cleyto_coin::chain::utxo::TransactionInput;
     use cleyto_coin::chain::utxo::TransactionOutput;
+    use cleyto_coin::chain::Chain;
     use cleyto_coin::node::Message;
     use cleyto_coin::{
         chain::{transaction::Transaction, wallet::Wallet},
@@ -32,6 +34,40 @@ mod handle_connection_tests {
             .unwrap();
 
         transaction
+    }
+
+    /// Returns the transaction along with the sender wallet and the genesis
+    /// UTXOs it spends, so the caller can seed a `Chain` that actually knows
+    /// about them (`Wallet::available_utxos` is crate-private, so these can't
+    /// be recovered from the wallet after the fact).
+    fn test_transaction_and_wallets(
+    ) -> (Transaction, Wallet, Vec<TransactionOutput>) {
+        let mut sender = Wallet::new();
+        let receiver = Wallet::new();
+        let original_outputs =
+            vec![TransactionOutput::new(1000, sender.0.clone())];
+        sender.0.add_utxos(original_outputs.clone());
+        let inputs = TransactionInput::from_outputs(original_outputs.clone());
+        let outputs = vec![TransactionOutput::new(1000, receiver.0.clone())];
+        let mut transaction = Transaction::new(inputs, outputs).unwrap();
+        sender
+            .1
+            .sign_all_owned_inputs_in_transaction(&mut transaction)
+            .unwrap();
+
+        (transaction, sender.0, original_outputs)
+    }
+
+    fn test_state_wallets(
+        first_receiver: Wallet,
+        utxo_original: Vec<TransactionOutput>,
+    ) -> Arc<Mutex<NodeState>> {
+        Arc::new(Mutex::new(NodeState {
+            status: true,
+            chain: Chain::new(first_receiver, utxo_original),
+            transactions_pool: Vec::new(),
+            connected_nodes: HashSet::new(),
+        }))
     }
 
     // --- Happy path: known endpoints -----------------------------------
@@ -68,12 +104,12 @@ mod handle_connection_tests {
 
     #[tokio::test]
     async fn test_post_submit_transaction_success() {
-        let tx = test_transaction();
+        let (tx, sender, original_outputs) = test_transaction_and_wallets();
         let message = Message::Transaction(tx);
         let body = serde_json::to_string(&message)
             .expect("failed to serialize transaction");
-        let result =
-            request("POST", "/messages", Some(&body), test_state()).await;
+        let state = test_state_wallets(sender, original_outputs);
+        let result = request("POST", "/messages", Some(&body), state).await;
         assert!(result.is_ok(), "expected Ok, got {:?}", result);
     }
 

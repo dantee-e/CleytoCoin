@@ -46,6 +46,15 @@ where
     pub fn get_slice(&self, range: std::ops::Range<usize>) -> &[T] {
         &self.vec[range]
     }
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+        self.vec.iter()
+    }
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&T) -> bool,
+    {
+        self.vec.retain(f);
+    }
 }
 
 impl<T> Default for OrderedVec<T>

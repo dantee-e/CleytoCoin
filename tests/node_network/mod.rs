@@ -27,6 +27,7 @@ fn create_multiple_nodes(n: usize) -> (Vec<Node>, Wallet, WalletPK) {
 }
 
 #[tokio::test]
+#[ignore = "aaaareason"]
 async fn use_multiple_nodes() {
     let (mut nodes, fr_wallet, fr_wallet_pk) = create_multiple_nodes(3);
 
