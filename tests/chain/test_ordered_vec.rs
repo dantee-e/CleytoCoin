@@ -1,37 +1,37 @@
 use cleyto_coin::chain::ordered_vector::OrderedVec;
-use cleyto_coin::chain::utxo::UTXO;
+use cleyto_coin::chain::utxo::{OutPoint, TransactionOutput, UTXO};
 use cleyto_coin::chain::wallet::Wallet;
 
 #[test]
 fn test_ordered_vec() {
     let (wallet1, _) = Wallet::new();
 
-    let input_utxos = vec![
-        UTXO::new(50000, wallet1.clone()),
-        UTXO::new(32000, wallet1.clone()),
-        UTXO::new(25000, wallet1.clone()),
-        UTXO::new(15000, wallet1.clone()),
-        UTXO::new(12000, wallet1.clone()),
-        UTXO::new(10000, wallet1.clone()),
-        UTXO::new(8500, wallet1.clone()),
-        UTXO::new(7200, wallet1.clone()),
-        UTXO::new(6000, wallet1.clone()),
-        UTXO::new(5500, wallet1.clone()),
-        UTXO::new(3000, wallet1.clone()),
-        UTXO::new(2500, wallet1.clone()),
-        UTXO::new(2000, wallet1.clone()),
-        UTXO::new(1500, wallet1.clone()),
-        UTXO::new(1200, wallet1.clone()),
-        UTXO::new(1000, wallet1.clone()),
-        UTXO::new(800, wallet1.clone()),
-        UTXO::new(600, wallet1.clone()),
-        UTXO::new(400, wallet1.clone()),
-        UTXO::new(300, wallet1.clone()),
+    let values = [
+        50000, 32000, 25000, 15000, 12000, 10000, 8500, 7200, 6000, 5500, 3000,
+        2500, 2000, 1500, 1200, 1000, 800, 600, 400, 300,
+        // repeated values in different coins must not be deduplicated
+        1000, 1000,
     ];
 
-    let vec = OrderedVec::from(input_utxos);
+    let input_utxos: Vec<UTXO> = values
+        .iter()
+        .enumerate()
+        .map(|(i, value)| {
+            UTXO::new(
+                OutPoint {
+                    txid: [i as u8; 32],
+                    vout: 0,
+                },
+                TransactionOutput::new(*value, &wallet1),
+            )
+        })
+        .collect();
 
-    for i in vec {
-        println!("utxo of value {}", i.value);
-    }
+    let vec = OrderedVec::from(input_utxos);
+    assert_eq!(vec.len(), values.len());
+
+    // Ordered from the biggest value to the smallest
+    let ordered: Vec<u64> = vec.into_iter().map(|u| u.output.value).collect();
+    println!("values: {ordered:?}");
+    assert!(ordered.windows(2).all(|pair| pair[0] >= pair[1]));
 }

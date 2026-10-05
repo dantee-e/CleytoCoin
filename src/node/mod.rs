@@ -53,10 +53,7 @@ impl Default for NodeState {
     fn default() -> Self {
         NodeState {
             status: true,
-            chain: Chain::new(
-                crate::chain::wallet::Wallet::null_wallet(),
-                vec![],
-            ),
+            chain: Chain::new(vec![]),
             transactions_pool: Vec::new(),
             connected_nodes: HashSet::new(),
         }

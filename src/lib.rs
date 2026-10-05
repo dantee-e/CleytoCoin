@@ -1,7 +1,7 @@
 use crate::{
     chain::{
         transaction::{self, Transaction},
-        utxo::{TransactionInput, UTXO},
+        utxo::{TransactionInput, TransactionOutput, UTXO},
         wallet::{Wallet, WalletPK},
         Chain,
     },
@@ -143,26 +143,31 @@ pub async fn send(
     let sender_wallet = WalletPK::from(sender_pkey);
     let recipient_wallet = Wallet::from(recipient_pkey);
 
-    // find input utxos
-    let input_utxos: Vec<TransactionInput> =
+    // select the coins to spend
+    let coins: Vec<UTXO> =
         match sender_wallet.public_wallet().get_utxos(amount) {
             Ok(vec) => vec,
             Err(_) => return Err(TransactionError::InsufficientFunds)?,
         };
 
-    // Create output UTXOs
-    let input_sum = TransactionInput::sum(&input_utxos);
-    let recipients_utxo = UTXO::new(amount, recipient_wallet.clone());
-    let change_utxo =
-        UTXO::new(input_sum - amount, sender_wallet.public_wallet());
-    let output_utxos = vec![change_utxo, recipients_utxo];
+    // Create outputs: the payment, plus the change back to the sender
+    let input_sum = UTXO::sum(&coins);
+    let mut outputs = vec![TransactionOutput::new(amount, &recipient_wallet)];
+    let change = input_sum - amount;
+    if change > 0 {
+        outputs.push(TransactionOutput::new(
+            change,
+            sender_wallet.public_wallet(),
+        ));
+    }
 
     // create transaction
-    let mut transaction = Transaction::new(input_utxos, output_utxos)?;
+    let mut transaction =
+        Transaction::new(TransactionInput::from_utxos(&coins), outputs)?;
 
     // sign the transaction
     sender_wallet
-        .sign_all_owned_inputs_in_transaction(&mut transaction)
+        .sign_all_owned_inputs_in_transaction(&mut transaction, &coins)
         .expect("Failed on signing of transaction");
 
     send_transaction(transaction).await
@@ -172,8 +177,7 @@ pub fn run_server_with_gui(server_name: String) -> color_eyre::Result<()> {
     // Channel to kill thread
     // let rx = Arc::new(Mutex::new(rx));
 
-    let (mut node, logger) =
-        node::Node::new(Chain::new(Wallet::null_wallet(), vec![]), server_name);
+    let (mut node, logger) = node::Node::new(Chain::new(vec![]), server_name);
 
     let node_name = node.name.to_string();
     // Run server thread
@@ -200,21 +204,34 @@ pub fn run_server_with_gui(server_name: String) -> color_eyre::Result<()> {
 /// Mostly useful for testing
 /// Returns the created server's name, to enable killing it later
 pub fn run_server_thread(server_name: String) -> String {
-    let (mut node, _) = node::Node::new(
-        Chain::new(Wallet::null_wallet(), vec![]),
-        server_name.to_string(),
-    );
+    run_server_thread_with_chain(server_name, Chain::new(vec![]))
+}
+
+/// Same as run_server_thread, but the node starts with the given chain
+pub fn run_server_thread_with_chain(server_name: String, chain: Chain) -> String {
+    let (mut node, _) = node::Node::new(chain, server_name.to_string());
+    let socket_location = node.socket_location.clone();
+
+    // Registers the name so the next new_server_name() doesn't return it again
+    add_name_to_running_servers(server_name.clone());
 
     thread::spawn(move || {
         node.run(true, 0);
     });
 
+    // Waits for the node to be listening, otherwise a kill_node right after this would find no
+    // socket and leave the node running
+    let deadline =
+        std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !socket_location.exists() && std::time::Instant::now() < deadline {
+        thread::sleep(std::time::Duration::from_millis(10));
+    }
+
     server_name
 }
 
 pub fn run_server(server_name: String) {
-    let (mut node, _) =
-        node::Node::new(Chain::new(Wallet::null_wallet(), vec![]), server_name);
+    let (mut node, _) = node::Node::new(Chain::new(vec![]), server_name);
     node.run(true, 0);
 }
 
@@ -262,8 +279,12 @@ pub fn kill_node(node: String) -> CleytoResult<()> {
 
     println!("Killed node {}", node);
 
-    std::fs::remove_file(socket_path)
-        .map_err(|e| CleytonError::KillServerError(e.to_string()))?;
+    // The node also removes its socket when it shuts down, so it may already be gone
+    match std::fs::remove_file(socket_path) {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(CleytonError::KillServerError(e.to_string())),
+    }
     remove_name_from_running_servers(node);
 
     Ok(())

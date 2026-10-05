@@ -33,6 +33,10 @@ pub enum TransactionError {
     UnsignedInput,
     InsufficientFunds,
     ConnectionError(String),
+    NoInputs,
+    DuplicateInput,
+    UtxoNotFound,
+    ValueOverflow,
 }
 impl fmt::Display for TransactionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -77,6 +81,25 @@ impl fmt::Display for TransactionError {
                             f,
                             "It wasn't possible to validate the transaction due to a missing signature for one of the inputs"
                         )
+            }
+            TransactionError::NoInputs => {
+                write!(
+                    f,
+                    "The transaction has no inputs. Only coinbase transactions, created as part \
+                    of a block, can have no inputs."
+                )
+            }
+            TransactionError::DuplicateInput => {
+                write!(f, "The transaction spends the same output more than once.")
+            }
+            TransactionError::UtxoNotFound => {
+                write!(
+                    f,
+                    "One of the inputs spends an output that doesn't exist or was already spent."
+                )
+            }
+            TransactionError::ValueOverflow => {
+                write!(f, "The values of the transaction overflow a u64.")
             }
         }
     }

@@ -78,7 +78,9 @@ impl Response {
             match self.status {
                 200 => "OK",
                 400 => "Bad Request",
+                404 => "Not Found",
                 405 => "Method Not Allowed",
+                500 => "Internal Server Error",
                 _ => "Unknown",
             },
             self.content_type,
@@ -245,16 +247,16 @@ impl HTTPRequest {
             HTTPResponse::ResourceNotFound => {
                 if accept.unwrap_or("").contains("text/html") {
                     Ok(Response::new(
-                        405,
+                        404,
                         "text/html",
-                        fs::read("static/405.html")
-                            .unwrap_or_else(|_| b"405 Invalid Method".to_vec()),
+                        fs::read("static/404.html")
+                            .unwrap_or_else(|_| b"404 Not Found".to_vec()),
                     ))
                 } else {
                     Ok(Response::new(
-                        405,
+                        404,
                         "text/plain",
-                        b"405 Invalid Method".to_vec(),
+                        b"404 Not Found".to_vec(),
                     ))
                 }
             }

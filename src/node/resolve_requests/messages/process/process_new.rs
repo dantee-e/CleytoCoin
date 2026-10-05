@@ -2,14 +2,11 @@ use crate::{
     chain::{
         block::Block,
         transaction::Transaction,
-        utxo::{TransactionInput, UTXO},
+        utxo::OutPoint,
         Chain,
     },
-    error_handling::{
-        CleytonError, TransactionDeserializeError, TransactionError,
-    },
+    error_handling::{CleytonError, TransactionError},
     node::{
-        data::check_block_is_registered_by_hash,
         resolve_requests::{
             errors::HTTPResponseError,
             helpers::HTTPResult,
@@ -31,7 +28,9 @@ pub fn process_new_block(
     connected_nodes: &HashSet<ConnectedNodeInfo>,
     source: Option<&[u8]>,
 ) -> HTTPResult {
-    if check_block_is_registered_by_hash(&block.hash()) {
+    // Already have it. Checked against the chain in memory: blocks received
+    // from other nodes are not written to disk
+    if chain.blocks.iter().any(|b| b.hash() == block.hash()) {
         return Ok(HTTPResponse::OK(None));
     }
     if block.previous_hash() == chain.get_last_hash() {
@@ -43,105 +42,72 @@ pub fn process_new_block(
     }
 }
 
+fn validation_error_to_http(error: CleytonError) -> HTTPResponseError {
+    match error {
+        CleytonError::TransactionError(e) => match e {
+            TransactionError::OpenSSLError(_) => {
+                HTTPResponseError::InternalServerError(Some(
+                    "Error in the OpenSSL library when verifying a transaction"
+                        .to_string(),
+                ))
+            }
+            // TODO Should move both of those to another error enum, maybe client and server errors
+            e @ (TransactionError::InsufficientFunds
+            | TransactionError::ConnectionError(_)) => {
+                HTTPResponseError::InternalServerError(Some(e.to_string()))
+            }
+            e => HTTPResponseError::BadRequest(Some(e.to_string())),
+        },
+        CleytonError::OpenSslErrorStack(_) => {
+            HTTPResponseError::InternalServerError(Some(
+                "Error in the OpenSSL library when verifying a transaction"
+                    .to_string(),
+            ))
+        }
+        _ => HTTPResponseError::InternalServerError(None),
+    }
+}
+
 pub fn process_new_transaction(
     transaction: Transaction,
     source: Option<&[u8]>,
     state: Arc<Mutex<NodeState>>,
 ) -> HTTPResult {
-    let transaction_pool = &mut state.lock().unwrap().transactions_pool.clone();
-    let connected_nodes = &state.lock().unwrap().connected_nodes.clone();
-    let wallets = &state.lock().unwrap().chain.wallets.clone();
+    let connected_nodes = {
+        let mut state = state.lock().unwrap();
 
-    if transaction_pool.contains(&transaction) {
-        return Ok(HTTPResponse::OK(None));
-    }
-
-    match transaction.verify_signatures() {
-        Ok(_) => (),
-        Err(e) => {
-            return match e {
-                CleytonError::TransactionDeserializeError(e) => match e {
-                    TransactionDeserializeError::InsufficientFunds => {
-                        Err(HTTPResponseError::InvalidBody(None))
-                    }
-                    TransactionDeserializeError::MalformedTransaction => {
-                        Err(HTTPResponseError::InvalidBody(None))
-                    }
-                    TransactionDeserializeError::SerdeError(_) => {
-                        Err(HTTPResponseError::InvalidBody(None))
-                    }
-                },
-                CleytonError::TransactionError(e) => match e {
-                    TransactionError::OpenSSLError(_) => Err(HTTPResponseError::InternalServerError(
-                        Some("Error in the OpenSSL library when verifying a transaction".to_string()),
-                    )),
-                    TransactionError::ValidationError => Err(HTTPResponseError::BadRequest(Some(
-                        "Transaction submitted with \
-                        invalid signature"
-                            .to_string(),
-                    ))),
-                    TransactionError::InsufficientInputs => Err(HTTPResponseError::BadRequest(Some(
-                        "Transaction's outputs are bigger that its inputs".to_string(),
-                    ))),
-                    // TODO Should move both of those to another error enum, maybe client and server errors
-                    TransactionError::InsufficientFunds => panic!("Not the server's problem"),
-                    TransactionError::ConnectionError(_) => panic!("Not the server's problem"),
-                        TransactionError::UnsignedInput => todo!(),
-                }
-                _ => {
-                    return Err(HTTPResponseError::InternalServerError(None))
-                }
-            };
+        if state.transactions_pool.contains(&transaction) {
+            return Ok(HTTPResponse::OK(None));
         }
-    }
 
-    // check if the wallets have the utxos that they claim to have
-    let mut seen: Vec<(_, _)> = Vec::new();
+        // Inputs exist and are unspent, signatures are valid, inputs cover outputs
+        state
+            .chain
+            .validate_transaction(&transaction)
+            .map_err(validation_error_to_http)?;
 
-    for input in transaction.inputs.iter() {
-        let key = (input.txid, input.index);
-        if seen.contains(&key) {
-            return Err(HTTPResponseError::InvalidBody(Some(String::from(
-                "Duplicate input in transaction",
-            ))));
-        }
-        seen.push(key);
-
-        println!("Wallets length is {}", wallets.len());
-
-        let wallet =
-            wallets.iter().find(|w| **w == input.owner).ok_or_else(|| {
-                HTTPResponseError::InvalidBody(Some(String::from(
-                    "Wallet owning the input not found",
-                )))
-            })?;
-
-        println!(
-            "available_utxos len is {}, utxo is {:#?}",
-            wallet.available_utxos.iter().len(),
-            wallet.available_utxos.get(0)
-        );
-        println!("Searching for utxo {:#?}", input.txid);
-
-        let utxo = wallet
-            .available_utxos
+        // Inputs must not be spent already by a transaction waiting in the pool
+        let spent_in_pool: HashSet<OutPoint> = state
+            .transactions_pool
             .iter()
-            .find(|u| u.txid == input.txid && u.index == input.index)
-            .ok_or_else(|| {
-                HTTPResponseError::InvalidBody(Some(String::from(
-                    "UTXO not found in wallet",
-                )))
-            })?;
-
-        // The claimed data must match the real UTXO
-        if utxo.value != input.value || utxo.owner != input.owner {
-            return Err(HTTPResponseError::InvalidBody(Some(String::from(
-                "Input does not match the UTXO it references",
+            .flat_map(|t| t.inputs.iter().map(|input| input.prev))
+            .collect();
+        if transaction
+            .inputs
+            .iter()
+            .any(|input| spent_in_pool.contains(&input.prev))
+        {
+            return Err(HTTPResponseError::BadRequest(Some(String::from(
+                "Transaction spends an output already spent by a transaction in the pool",
             ))));
         }
-    }
-    notify_new_transaction(&transaction, connected_nodes, source);
-    transaction_pool.push(transaction);
+
+        state.transactions_pool.push(transaction.clone());
+        state.connected_nodes.clone()
+    };
+
+    // The lock is released before talking to the network
+    notify_new_transaction(&transaction, &connected_nodes, source);
 
     Ok(HTTPResponse::OK(Some(Content::JSON(json!({
         "msg": "The transaction was added to the pool.",

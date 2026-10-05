@@ -1,5 +1,7 @@
 use cleyto_coin::chain::transaction::Transaction;
-use cleyto_coin::chain::utxo::{TransactionInput, UTXO};
+use cleyto_coin::chain::utxo::{
+    OutPoint, TransactionInput, TransactionOutput, UTXO,
+};
 use cleyto_coin::chain::wallet::Wallet;
 use reqwest::Client;
 use std::error::Error;
@@ -18,18 +20,30 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
     let (wallet_sender, walletpk_sender) = Wallet::new();
     let (wallet_receiver, _) = Wallet::new();
 
-    let input_utxos = vec![
-        TransactionInput::new(1000, wallet_sender.clone()),
-        TransactionInput::new(2000, wallet_sender.clone()),
-    ];
-    let output_utxos = vec![
-        UTXO::new(2500, wallet_receiver.clone()),
-        UTXO::new(500, wallet_sender.clone()),
+    // Made up coins: a real client would get them from a node's UTXO set
+    let coins: Vec<UTXO> = [1000, 2000]
+        .into_iter()
+        .enumerate()
+        .map(|(i, value)| {
+            UTXO::new(
+                OutPoint {
+                    txid: [i as u8; 32],
+                    vout: 0,
+                },
+                TransactionOutput::new(value, &wallet_sender),
+            )
+        })
+        .collect();
+    let outputs = vec![
+        TransactionOutput::new(2500, &wallet_receiver),
+        TransactionOutput::new(500, &wallet_sender),
     ];
     let mut transaction: Transaction =
-        Transaction::new(input_utxos, output_utxos).unwrap();
+        Transaction::new(TransactionInput::from_utxos(&coins), outputs)
+            .unwrap();
 
-    match walletpk_sender.sign_all_owned_inputs_in_transaction(&mut transaction)
+    match walletpk_sender
+        .sign_all_owned_inputs_in_transaction(&mut transaction, &coins)
     {
         Ok(signed_hashed_message) => signed_hashed_message,
         _ => panic!("error while signing transaction"),

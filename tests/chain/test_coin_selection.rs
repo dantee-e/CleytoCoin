@@ -1,7 +1,18 @@
 use cleyto_coin::chain::{
-    utxo::{TransactionInput, UTXO},
+    utxo::{OutPoint, TransactionOutput, UTXO},
     wallet::Wallet,
 };
+
+/// Coin with a made up, unique outpoint
+fn coin(i: u8, value: u64, owner: &Wallet) -> UTXO {
+    UTXO::new(
+        OutPoint {
+            txid: [i; 32],
+            vout: 0,
+        },
+        TransactionOutput::new(value, owner),
+    )
+}
 
 #[test]
 fn test_get_utxo_wallet() {
@@ -9,43 +20,45 @@ fn test_get_utxo_wallet() {
 
     let utxos = vec![
         // Large UTXOs - good for covering big amounts efficiently
-        UTXO::new(50000, wallet1.clone()),
-        UTXO::new(25000, wallet1.clone()),
+        coin(0, 50000, &wallet1),
+        coin(1, 25000, &wallet1),
         // Medium UTXOs - typical transaction amounts
-        UTXO::new(10000, wallet1.clone()),
-        UTXO::new(5000, wallet1.clone()),
+        coin(2, 10000, &wallet1),
+        coin(3, 5000, &wallet1),
         // Small UTXOs - test efficiency vs dust management
-        UTXO::new(3000, wallet1.clone()),
-        UTXO::new(1200, wallet1.clone()),
-        UTXO::new(1000, wallet1.clone()),
+        coin(4, 3000, &wallet1),
+        coin(5, 1200, &wallet1),
+        coin(6, 1000, &wallet1),
         // Very small UTXOs - potential dust scenarios
-        UTXO::new(300, wallet1.clone()),
+        coin(7, 300, &wallet1),
     ];
 
-    fn print_utxo_vec(input_utxos: Vec<TransactionInput>) {
-        for utxo in input_utxos {
-            println!("utxo: ({})", utxo.value);
+    /// The selection must cover the amount, using each of the wallet's coins
+    /// at most once
+    fn check_selection(selected: &[UTXO], available: &[UTXO], amount: u64) {
+        for utxo in selected {
+            println!("utxo: ({})", utxo.output.value);
         }
+        assert!(
+            UTXO::sum(&selected.to_vec()) >= amount,
+            "selection doesn't cover {amount}"
+        );
+        assert!(selected.iter().all(|u| available.contains(u)));
+        let mut outpoints: Vec<_> = selected.iter().map(|u| u.outpoint).collect();
+        outpoints.sort();
+        outpoints.dedup();
+        assert_eq!(outpoints.len(), selected.len(), "a coin was selected twice");
     }
 
-    wallet1.add_utxos(utxos);
-    println!("Checkpoint 1");
+    wallet1.add_utxos(utxos.clone());
 
-    assert_eq!(
-        wallet1.get_utxos(50000).unwrap(),
-        vec![TransactionInput::new(50000, wallet1.clone())]
-    );
-    println!("Checkpoint 2");
+    // exact match
+    assert_eq!(wallet1.get_utxos(50000).unwrap(), vec![coin(0, 50000, &wallet1)]);
 
+    // more than the whole balance
     assert!(wallet1.get_utxos(100000000).is_err());
-    println!("Checkpoint 3");
 
-    print_utxo_vec(wallet1.get_utxos(30000).unwrap());
-    println!("Checkpoint 4");
-
-    print_utxo_vec(wallet1.get_utxos(40000).unwrap());
-    println!("Checkpoint 5");
-
-    print_utxo_vec(wallet1.get_utxos(60000).unwrap());
-    println!("Checkpoint 6");
+    for amount in [30000, 40000, 60000] {
+        check_selection(&wallet1.get_utxos(amount).unwrap(), &utxos, amount);
+    }
 }

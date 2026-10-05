@@ -1,14 +1,10 @@
-use super::transaction::Transaction;
 use crate::chain::ordered_vector::OrderedVec;
-use crate::chain::utxo::{TransactionInput, UTXO};
+use crate::chain::utxo::{OutPoint, PublicKey, UTXO};
 use crate::configs::ConfigPaths;
-use crate::error_handling::{CleytoResult, TransactionError};
 
 pub use super::wallet_pk::WalletPK;
-use openssl::hash::MessageDigest;
 use openssl::pkey::{PKey, Public};
 use openssl::rsa::Rsa;
-use openssl::sign::Verifier;
 use serde::de;
 use serde::{Deserialize, Serialize};
 
@@ -152,31 +148,13 @@ impl Wallet {
         )
     }
 
-    /// Verify a signed `TransactionInfo` using the stored public key.
-    pub fn verify_transaction_info(
-        &self,
-        transaction_info: &Transaction,
-    ) -> CleytoResult<bool> {
-        for input in &transaction_info.inputs {
-            let mut verifier =
-                Verifier::new(MessageDigest::sha256(), &self.public_key)?;
-            verifier.update(
-                &transaction_info.get_ordered_bytes_for_signing(input),
-            )?;
-
-            if let Some(signature) = &input.signature {
-                if !verifier.verify(signature)? {
-                    return Ok(false);
-                }
-            } else {
-                return Err(
-                    crate::error_handling::CleytonError::TransactionError(
-                        TransactionError::UnsignedInput,
-                    ),
-                );
-            }
-        }
-        Ok(true)
+    /// The key that owns outputs paid to this wallet
+    pub fn to_public_key(&self) -> PublicKey {
+        PublicKey(
+            self.public_key
+                .public_key_to_der()
+                .expect("DER conversion failed"),
+        )
     }
 
     /// Export the public key as PEM bytes.
@@ -224,11 +202,9 @@ impl Wallet {
      * --------------------------------------------------------------------- */
     /// Public entry point – selects a set of UTXOs whose summed value covers
     /// `amount`. Returns an error if the wallet does not contain enough funds.
-    /// Returns the TransactionOutputs as TransactionInputs
-    pub fn get_utxos(
-        &self,
-        amount: u64,
-    ) -> Result<Vec<TransactionInput>, WalletError> {
+    /// Turn them into inputs with `TransactionInput::from_utxos`, and pass them to
+    /// `WalletPK::sign_all_owned_inputs_in_transaction` to sign.
+    pub fn get_utxos(&self, amount: u64) -> Result<Vec<UTXO>, WalletError> {
         let utxos = self.available_utxos.clone();
 
         // If the total balance is insufficient stop
@@ -238,16 +214,16 @@ impl Wallet {
 
         // exact‑match exit
         if let Some(single) =
-            utxos.clone().into_iter().find(|u| u.value == amount)
+            utxos.clone().into_iter().find(|u| u.output.value == amount)
         {
-            return Ok(vec![single.clone().into()]);
+            return Ok(vec![single]);
         }
 
         // smallest UTXO that already exceeds the target
         let first_over_idx = utxos
             .clone()
             .into_iter()
-            .position(|u| u.value < amount)
+            .position(|u| u.output.value < amount)
             .unwrap_or(0);
 
         // Branch‑and‑bound selection on the remaining (smaller) UTXOs.
@@ -259,10 +235,13 @@ impl Wallet {
         let estimates: Vec<UtxoEstimate> = smaller_utxos
             .iter()
             .map(|u| {
-                total_sum += u.value;
+                total_sum += u.output.value;
                 UtxoEstimate {
                     utxo: u.clone(),
-                    effective_value: u.value - Self::estimate_fee_per_utxo(u),
+                    effective_value: u
+                        .output
+                        .value
+                        .saturating_sub(Self::estimate_fee_per_utxo(u)),
                     weight: UTXO_WEIGHT,
                 }
             })
@@ -275,13 +254,8 @@ impl Wallet {
             total_sum,
         );
 
-        let bnb_solution_as_inputs = bnb_solution
-            .into_iter()
-            .map(|output| output.into())
-            .collect::<Vec<TransactionInput>>();
-
-        if !bnb_solution_as_inputs.is_empty() {
-            return Ok(bnb_solution_as_inputs);
+        if !bnb_solution.is_empty() {
+            return Ok(bnb_solution);
         } else {
             println!("bnb solution is empty");
         }
@@ -306,11 +280,7 @@ impl Wallet {
             return Err(WalletError::InsufficientFunds);
         }
 
-        let solution_as_inputs = solution
-            .into_iter()
-            .map(|output| output.into())
-            .collect::<Vec<TransactionInput>>();
-        Ok(solution_as_inputs)
+        Ok(solution)
     }
 
     // Helper: compute “waste” (extra fee paid beyond the long‑term rate).
@@ -467,8 +437,10 @@ impl Wallet {
             .iter()
             .map(|utxo| UtxoEstimate {
                 utxo: utxo.clone(),
-                effective_value: utxo.value
-                    - Wallet::estimate_fee_per_utxo(utxo),
+                effective_value: utxo
+                    .output
+                    .value
+                    .saturating_sub(Wallet::estimate_fee_per_utxo(utxo)),
                 weight: UTXO_WEIGHT,
             })
             .collect();
@@ -512,7 +484,7 @@ impl Wallet {
             Some(_) => vec![slice[middle_index].clone()],
             None => return,
         };
-        sum += slice[middle_index].utxo.value;
+        sum += slice[middle_index].utxo.output.value;
 
         if number_of_iterations == -1 {
             println!("number_of_iterations is still {number_of_iterations}");
@@ -534,7 +506,7 @@ impl Wallet {
             };
 
             if let Some(x) = slice.get(index) {
-                sum += x.utxo.value;
+                sum += x.utxo.output.value;
                 elements.push(x.clone());
                 // println!(
                 //     "Pushing {} to sum {} on position {position} with target {target}",
@@ -586,12 +558,8 @@ impl Wallet {
             position * 2 + 1,
         );
     }
-    pub fn remove_utxo(&mut self, spent: &TransactionInput) {
-        self.available_utxos.retain(|u| {
-            u.value != spent.value
-                || u.owner != spent.owner
-                || u.index != spent.index
-        });
+    pub fn remove_utxo(&mut self, spent: &OutPoint) {
+        self.available_utxos.retain(|u| &u.outpoint != spent);
     }
 }
 

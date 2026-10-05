@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::utils::PROOF_OF_WORK_DIFFICULTY;
 use super::Chain;
 use crate::chain::transaction::Transaction;
-use crate::chain::utxo::{TransactionInput, UTXO};
-use crate::chain::wallet::Wallet;
+use crate::chain::utxo::TransactionOutput;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -77,7 +76,7 @@ impl Block {
                         Some(transaction) => transaction,
                         None => transactions.last().unwrap(),
                     }
-                    .txid
+                    .txid()
                 };
                 transaction_hash
             })
@@ -175,27 +174,9 @@ impl Block {
         block
     }
 
-    pub fn genesis_block(
-        first_receiver: Wallet,
-        utxo_original: Vec<UTXO>,
-    ) -> Self {
-        let original_wallet = Wallet::new();
-
-        let transaction_inputs: Vec<TransactionInput> = utxo_original
-            .iter()
-            .enumerate()
-            .map(|(i, utxo)| TransactionInput::new(utxo.clone(), i))
-            .collect();
-
-        let mut transaction =
-            Transaction::new(transaction_inputs, utxo_original).unwrap();
-
-        original_wallet
-            .1
-            .sign_all_owned_inputs_in_transaction(&mut transaction)
-            .unwrap();
-
-        let transactions_vec = vec![transaction];
+    /// The genesis block holds a single coinbase transaction creating `genesis_outputs`
+    pub fn genesis_block(genesis_outputs: Vec<TransactionOutput>) -> Self {
+        let transactions_vec = vec![Transaction::coinbase(1, genesis_outputs)];
 
         let merkle_root = Block::calculate_merkle_root(&transactions_vec);
         Self {

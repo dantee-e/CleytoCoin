@@ -5,8 +5,7 @@ mod handle_connection_tests {
     use std::sync::Mutex;
 
     use super::super::super::mock_stream::{request, send_data};
-    use cleyto_coin::chain::utxo::TransactionInput;
-    use cleyto_coin::chain::utxo::UTXO;
+    use cleyto_coin::chain::utxo::{TransactionInput, TransactionOutput};
     use cleyto_coin::chain::Chain;
     use cleyto_coin::node::Message;
     use cleyto_coin::{
@@ -20,52 +19,65 @@ mod handle_connection_tests {
         Arc::new(Mutex::new(NodeState::default()))
     }
 
-    /// Builds a single, validly-signed transaction, mirroring the pattern
-    /// used in chain::testing::test_chain().
-    fn test_transaction() -> Transaction {
+    /// A node state whose genesis gives 1000 to a sender, and a validly
+    /// signed transaction sending those 1000 to a receiver.
+    fn funded_state_and_transaction() -> (Arc<Mutex<NodeState>>, Transaction)
+    {
+        let (state, transaction, _) = funded_state_and_signer(1000);
+        (state, transaction)
+    }
+
+    /// Same as above, sending `amount` (<= 1000), and also returns a
+    /// function that builds more signed transactions spending the same coin
+    fn funded_state_and_signer(
+        amount: u64,
+    ) -> (
+        Arc<Mutex<NodeState>>,
+        Transaction,
+        impl Fn(u64) -> Transaction,
+    ) {
         let sender = Wallet::new();
         let receiver = Wallet::new();
-        let inputs = vec![TransactionInput::new(1000, sender.0.clone())];
-        let outputs = vec![UTXO::new(1000, receiver.0.clone())];
-        let mut transaction = Transaction::new(inputs, outputs).unwrap();
-        sender
-            .1
-            .sign_all_owned_inputs_in_transaction(&mut transaction)
-            .unwrap();
+        let chain = Chain::new(vec![TransactionOutput::new(1000, &sender.0)]);
+        let coins = chain.utxos_owned_by(&sender.0.to_public_key());
 
-        transaction
-    }
+        let spend = move |amount: u64| {
+            let outputs = vec![TransactionOutput::new(amount, &receiver.0)];
+            let mut transaction =
+                Transaction::new(TransactionInput::from_utxos(&coins), outputs)
+                    .unwrap();
+            sender
+                .1
+                .sign_all_owned_inputs_in_transaction(&mut transaction, &coins)
+                .unwrap();
+            transaction
+        };
 
-    /// Returns the transaction along with the sender wallet and the genesis
-    /// UTXOs it spends, so the caller can seed a `Chain` that actually knows
-    /// about them (`Wallet::available_utxos` is crate-private, so these can't
-    /// be recovered from the wallet after the fact).
-    fn test_transaction_and_wallets() -> (Transaction, Wallet, Vec<UTXO>) {
-        let mut sender = Wallet::new();
-        let receiver = Wallet::new();
-        let original_outputs = vec![UTXO::new(1000, sender.0.clone())];
-        sender.0.add_utxos(original_outputs.clone());
-        let inputs = TransactionInput::from_outputs(original_outputs.clone());
-        let outputs = vec![UTXO::new(1000, receiver.0.clone())];
-        let mut transaction = Transaction::new(inputs, outputs).unwrap();
-        sender
-            .1
-            .sign_all_owned_inputs_in_transaction(&mut transaction)
-            .unwrap();
-
-        (transaction, sender.0, original_outputs)
-    }
-
-    fn test_state_wallets(
-        first_receiver: Wallet,
-        utxo_original: Vec<UTXO>,
-    ) -> Arc<Mutex<NodeState>> {
-        Arc::new(Mutex::new(NodeState {
+        let state = Arc::new(Mutex::new(NodeState {
             status: true,
-            chain: Chain::new(first_receiver, utxo_original),
+            chain,
             transactions_pool: Vec::new(),
             connected_nodes: HashSet::new(),
-        }))
+        }));
+
+        (state, spend(amount), spend)
+    }
+
+    /// Asserts the request failed and that its log message contains
+    /// `expected`, so a test can't pass by failing for an unrelated reason
+    fn assert_err_contains(
+        result: &Result<Option<String>, Option<String>>,
+        expected: &str,
+    ) {
+        match result {
+            Err(Some(message)) => assert!(
+                message.contains(expected),
+                "expected error containing {expected:?}, got {message:?}"
+            ),
+            other => panic!(
+                "expected error containing {expected:?}, got {other:?}"
+            ),
+        }
     }
 
     // --- Happy path: known endpoints -----------------------------------
@@ -102,13 +114,44 @@ mod handle_connection_tests {
 
     #[tokio::test]
     async fn test_post_submit_transaction_success() {
-        let (tx, sender, original_outputs) = test_transaction_and_wallets();
+        let (state, tx) = funded_state_and_transaction();
         let message = Message::Transaction(tx);
         let body = serde_json::to_string(&message)
             .expect("failed to serialize transaction");
-        let state = test_state_wallets(sender, original_outputs);
-        let result = request("POST", "/messages", Some(&body), state).await;
+        let result =
+            request("POST", "/messages", Some(&body), state.clone()).await;
         assert!(result.is_ok(), "expected Ok, got {:?}", result);
+        assert_eq!(state.lock().unwrap().transactions_pool.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_post_submit_transaction_unknown_utxo_returns_err() {
+        // Valid transaction, but the node's chain doesn't have its coins
+        let (_, tx) = funded_state_and_transaction();
+        let body = serde_json::to_string(&Message::Transaction(tx)).unwrap();
+        let result =
+            request("POST", "/messages", Some(&body), test_state()).await;
+        assert_err_contains(&result, "doesn't exist or was already spent");
+    }
+
+    #[tokio::test]
+    async fn test_post_submit_double_spend_returns_err() {
+        // A second, validly signed, transaction spending the same coin as
+        // one already in the pool
+        let (state, tx, spend) = funded_state_and_signer(1000);
+        let double_spend = spend(999);
+
+        let body = serde_json::to_string(&Message::Transaction(tx)).unwrap();
+        request("POST", "/messages", Some(&body), state.clone())
+            .await
+            .unwrap();
+
+        let body =
+            serde_json::to_string(&Message::Transaction(double_spend)).unwrap();
+        let result =
+            request("POST", "/messages", Some(&body), state.clone()).await;
+        assert_err_contains(&result, "already spent by a transaction in the pool");
+        assert_eq!(state.lock().unwrap().transactions_pool.len(), 1);
     }
 
     #[ignore = "KeyRefresh not implemented"]
@@ -129,32 +172,20 @@ mod handle_connection_tests {
     async fn test_unknown_path_returns_err() {
         let result =
             request("GET", "/does-not-exist", None, test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err for unknown path, got {:?}",
-            result
-        );
+        assert_err_contains(&result, "Path /does-not-exist was not found");
     }
 
     #[tokio::test]
     async fn test_method_not_allowed_on_get_only_path() {
         let result = request("POST", "/", Some("{}"), test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err for disallowed method, got {:?}",
-            result
-        );
+        assert_err_contains(&result, "with wrong method");
     }
 
     #[tokio::test]
     async fn test_method_not_allowed_on_post_only_path() {
-        let result =
-            request("GET", "/submit-transaction", None, test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err for disallowed method, got {:?}",
-            result
-        );
+        // /messages only accepts POST
+        let result = request("GET", "/messages", None, test_state()).await;
+        assert_err_contains(&result, "with wrong method");
     }
 
     // --- Malformed / missing content-length -------------------------------
@@ -163,22 +194,15 @@ mod handle_connection_tests {
     async fn test_post_missing_content_length_returns_err() {
         let raw = b"POST /messages HTTP/1.1\r\nhost: localhost\r\n\r\n{}";
         let result = send_data(raw, test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err due to MissingContentLength, got {:?}",
-            result
-        );
+        assert_err_contains(&result, "Missing content-length");
     }
 
     #[tokio::test]
     async fn test_post_invalid_content_length_returns_err() {
         let raw = b"POST /messages HTTP/1.1\r\nhost: localhost\r\ncontent-length: not-a-number\r\n\r\n{}";
         let result = send_data(raw, test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err due to invalid content-length, got {:?}",
-            result
-        );
+        // An unparseable content-length is reported as a missing one
+        assert_err_contains(&result, "Missing content-length");
     }
 
     // --- Malformed status line / headers -----------------------------------
@@ -186,33 +210,21 @@ mod handle_connection_tests {
     #[tokio::test]
     async fn test_empty_request_returns_err() {
         let result = send_data(b"", test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err for empty request, got {:?}",
-            result
-        );
+        assert_err_contains(&result, "Invalid status line");
     }
 
     #[tokio::test]
     async fn test_incomplete_request_line_returns_err() {
         let raw = b"GET /\r\n\r\n";
         let result = send_data(raw, test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err for incomplete request line, got {:?}",
-            result
-        );
+        assert_err_contains(&result, "Invalid request line");
     }
 
     #[tokio::test]
     async fn test_malformed_header_returns_err() {
         let raw = b"GET / HTTP/1.1\r\nnotaheader\r\n\r\n";
         let result = send_data(raw, test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err for malformed header, got {:?}",
-            result
-        );
+        assert_err_contains(&result, "Invalid request line");
     }
 
     // --- Bad request bodies ------------------------------------------------
@@ -222,11 +234,8 @@ mod handle_connection_tests {
         let bad_body = "not a valid transaction";
         let result =
             request("POST", "/messages", Some(bad_body), test_state()).await;
-        assert!(
-            result.is_err(),
-            "expected Err for malformed transaction body, got {:?}",
-            result
-        );
+        // A body that isn't a Message is rejected (InvalidBody) without a log
+        assert_eq!(result, Err(None));
     }
 
     #[tokio::test]
@@ -235,19 +244,11 @@ mod handle_connection_tests {
         // transaction_info — exercises the deeper business-logic validation
         // path (not just JSON parsing), assuming submit_transaction checks
         // signature validity before accepting into the pool.
-        let mut tx = test_transaction();
-        let bogus = Wallet::new();
-        let mut bogus_info = Transaction::new(
-            vec![TransactionInput::new(1, bogus.0.clone())],
-            vec![UTXO::new(1, bogus.0.clone())],
-        )
-        .unwrap();
-        bogus
-            .1
-            .sign_all_owned_inputs_in_transaction(&mut bogus_info)
-            .unwrap();
-
-        let signature = bogus_info.inputs.first().unwrap().signature.clone();
+        let (state, mut tx) = funded_state_and_transaction();
+        // Transaction::default is signed by its own random wallet, so its
+        // signature is a valid signature from someone who isn't the owner
+        let bogus = Transaction::default();
+        let signature = bogus.inputs.first().unwrap().signature.clone();
 
         tx.inputs
             .iter_mut()
@@ -256,12 +257,9 @@ mod handle_connection_tests {
         let message = Message::Transaction(tx);
         let body = serde_json::to_string(&message).unwrap();
         let result =
-            request("POST", "/messages", Some(&body), test_state()).await;
+            request("POST", "/messages", Some(&body), state.clone()).await;
 
-        assert!(
-            result.is_err(),
-            "expected Err for tampered/invalid signature, got {:?}",
-            result
-        );
+        assert_err_contains(&result, "signature did not match");
+        assert!(state.lock().unwrap().transactions_pool.is_empty());
     }
 }

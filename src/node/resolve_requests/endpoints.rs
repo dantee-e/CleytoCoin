@@ -74,10 +74,16 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
             check_block_by_block_header(block_header, chain)
         }
         Message::Block(block) => {
-            let chain = &mut state.lock().unwrap().chain;
-            let connected_nodes = &state.lock().unwrap().connected_nodes;
+            // A single lock: locking twice in the same scope deadlocks
+            let mut guard = state.lock().unwrap();
+            let state = &mut *guard;
             // TODO eventually add the source
-            process_new_block(block, chain, connected_nodes, None)
+            process_new_block(
+                block,
+                &mut state.chain,
+                &state.connected_nodes,
+                None,
+            )
         }
         Message::NewNode(new_node_message) => {
             let connected_nodes = &mut state.lock().unwrap().connected_nodes;

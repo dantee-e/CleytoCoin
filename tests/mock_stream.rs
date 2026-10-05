@@ -70,6 +70,3 @@ pub async fn request(
 ) -> Result<Option<String>, Option<String>> {
     send_data(&raw_request(method, path, body), state).await
 }
-
-#[tokio::test]
-async fn resolve_endpoints_test() {}
