@@ -1,6 +1,6 @@
 use super::wallet::Wallet;
-use crate::chain::ordered_vector::OrderedVec;
 use crate::chain::utxo::TransactionInput;
+use crate::chain::utxo::TransactionOutput;
 use crate::chain::utxo::UTXO;
 use crate::error_handling::CleytoResult;
 use crate::error_handling::TransactionDeserializeError;
@@ -33,8 +33,10 @@ impl Transaction {
 
         bytes.extend((self.inputs.len() as u64).to_be_bytes());
         for input in &self.inputs {
-            bytes.extend(input.txid.unwrap()); // fixed 32 bytes
-            bytes.extend(input.index.to_be_bytes());
+            bytes.extend(input.inpoint.to_be_bytes());
+            bytes.extend(input.utxo.txid); // fixed 32 bytes
+            bytes.extend(input.utxo.owner.public_key.raw_public_key().unwrap());
+            bytes.extend(input.utxo.value.to_be_bytes());
         }
 
         bytes.extend((self.outputs.len() as u64).to_be_bytes());
@@ -49,10 +51,11 @@ impl Transaction {
 
     pub fn new(
         inputs: Vec<TransactionInput>,
-        mut outputs: Vec<UTXO>,
+        outputs: Vec<TransactionOutput>,
     ) -> CleytoResult<Self> {
         let input_sum = TransactionInput::sum(&inputs);
-        let output_sum = UTXO::sum(&outputs);
+        let output_sum = TransactionOutput::sum(&outputs);
+        let new_utxos: Vec<UTXO> = Vec::new();
 
         let change: i64 = input_sum as i64 - output_sum as i64;
 
@@ -61,7 +64,7 @@ impl Transaction {
         }
 
         for (i, output) in outputs.iter_mut().enumerate() {
-            output.index = Some(i as u32)
+            output.outpoint = i
         }
 
         let mut transaction = Self {
@@ -73,7 +76,7 @@ impl Transaction {
 
         let to_hash = transaction.get_ordered_bytes_for_signing();
         let mut hasher: Sha256 = Sha256::new();
-        hasher.update(to_hash.as_bytes());
+        hasher.update(&to_hash);
         transaction.txid = hasher.finish().to_owned();
 
         Ok(transaction)
@@ -88,7 +91,7 @@ impl Transaction {
         for input in &self.inputs {
             println!("i = {i}");
             println!("input is {}", input);
-            if !input.owner.verify_transaction_info(self)? {
+            if !input.utxo.owner.verify_transaction_info(self)? {
                 println!("on error i = {i}");
                 Err(TransactionError::ValidationError)?
             }
@@ -131,8 +134,9 @@ impl Default for Transaction {
 
         let value: u64 = rand::random();
 
-        let input = TransactionInput::new(value, sender.clone());
-        let output = UTXO::new(value, receiver.clone());
+        let input =
+            TransactionInput::new(UTXO::new(value, sender, 0, [0; 32]), 0);
+        let output = UTXO::new(value, receiver.clone(), 0);
 
         let mut transaction_info =
             Transaction::new(vec![input], vec![output]).unwrap();

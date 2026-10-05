@@ -25,7 +25,7 @@ impl WalletPK {
         let mut signer =
             Signer::new(MessageDigest::sha256(), &self.private_key)?;
         let signature = signer.sign_oneshot_to_vec(
-            &transaction_info.get_ordered_bytes_for_signing(input),
+            &transaction_info.get_ordered_bytes_for_signing(),
         )?;
         input.signature = Some(signature);
         Ok(())

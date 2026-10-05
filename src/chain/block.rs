@@ -184,9 +184,7 @@ impl Block {
         let transaction_inputs: Vec<TransactionInput> = utxo_original
             .iter()
             .enumerate()
-            .map(|(i, output)| {
-                TransactionInput::new(output.value, first_receiver.clone(), i)
-            })
+            .map(|(i, utxo)| TransactionInput::new(utxo.clone(), i))
             .collect();
 
         let mut transaction =
