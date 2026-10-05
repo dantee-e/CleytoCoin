@@ -1,7 +1,7 @@
 use cleyto_coin::chain::{
     block::Block,
     transaction::Transaction,
-    utxo::{TransactionInput, TransactionOutput},
+    utxo::{TransactionInput, UTXO},
     wallet::Wallet,
     Chain,
 };
@@ -16,8 +16,8 @@ fn create_block_and_add_chain() {
         TransactionInput::new(2000, wallet1.clone()),
     ];
     let output_utxos = vec![
-        TransactionOutput::new(2500, wallet2.clone()),
-        TransactionOutput::new(500, wallet2.clone()),
+        UTXO::new(2500, wallet2.clone()),
+        UTXO::new(500, wallet2.clone()),
     ];
     let mut transaction: Transaction =
         Transaction::new(input_utxos, output_utxos).unwrap();

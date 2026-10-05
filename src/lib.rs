@@ -1,7 +1,7 @@
 use crate::{
     chain::{
         transaction::{self, Transaction},
-        utxo::{TransactionInput, TransactionOutput},
+        utxo::{TransactionInput, UTXO},
         wallet::{Wallet, WalletPK},
         Chain,
     },
@@ -152,12 +152,9 @@ pub async fn send(
 
     // Create output UTXOs
     let input_sum = TransactionInput::sum(&input_utxos);
-    let recipients_utxo =
-        TransactionOutput::new(amount, recipient_wallet.clone());
-    let change_utxo = TransactionOutput::new(
-        input_sum - amount,
-        sender_wallet.public_wallet(),
-    );
+    let recipients_utxo = UTXO::new(amount, recipient_wallet.clone());
+    let change_utxo =
+        UTXO::new(input_sum - amount, sender_wallet.public_wallet());
     let output_utxos = vec![change_utxo, recipients_utxo];
 
     // create transaction

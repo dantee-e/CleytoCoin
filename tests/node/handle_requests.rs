@@ -6,7 +6,7 @@ mod handle_connection_tests {
 
     use super::super::super::mock_stream::{request, send_data};
     use cleyto_coin::chain::utxo::TransactionInput;
-    use cleyto_coin::chain::utxo::TransactionOutput;
+    use cleyto_coin::chain::utxo::UTXO;
     use cleyto_coin::chain::Chain;
     use cleyto_coin::node::Message;
     use cleyto_coin::{
@@ -26,7 +26,7 @@ mod handle_connection_tests {
         let sender = Wallet::new();
         let receiver = Wallet::new();
         let inputs = vec![TransactionInput::new(1000, sender.0.clone())];
-        let outputs = vec![TransactionOutput::new(1000, receiver.0.clone())];
+        let outputs = vec![UTXO::new(1000, receiver.0.clone())];
         let mut transaction = Transaction::new(inputs, outputs).unwrap();
         sender
             .1
@@ -40,15 +40,13 @@ mod handle_connection_tests {
     /// UTXOs it spends, so the caller can seed a `Chain` that actually knows
     /// about them (`Wallet::available_utxos` is crate-private, so these can't
     /// be recovered from the wallet after the fact).
-    fn test_transaction_and_wallets(
-    ) -> (Transaction, Wallet, Vec<TransactionOutput>) {
+    fn test_transaction_and_wallets() -> (Transaction, Wallet, Vec<UTXO>) {
         let mut sender = Wallet::new();
         let receiver = Wallet::new();
-        let original_outputs =
-            vec![TransactionOutput::new(1000, sender.0.clone())];
+        let original_outputs = vec![UTXO::new(1000, sender.0.clone())];
         sender.0.add_utxos(original_outputs.clone());
         let inputs = TransactionInput::from_outputs(original_outputs.clone());
-        let outputs = vec![TransactionOutput::new(1000, receiver.0.clone())];
+        let outputs = vec![UTXO::new(1000, receiver.0.clone())];
         let mut transaction = Transaction::new(inputs, outputs).unwrap();
         sender
             .1
@@ -60,7 +58,7 @@ mod handle_connection_tests {
 
     fn test_state_wallets(
         first_receiver: Wallet,
-        utxo_original: Vec<TransactionOutput>,
+        utxo_original: Vec<UTXO>,
     ) -> Arc<Mutex<NodeState>> {
         Arc::new(Mutex::new(NodeState {
             status: true,
@@ -241,7 +239,7 @@ mod handle_connection_tests {
         let bogus = Wallet::new();
         let mut bogus_info = Transaction::new(
             vec![TransactionInput::new(1, bogus.0.clone())],
-            vec![TransactionOutput::new(1, bogus.0.clone())],
+            vec![UTXO::new(1, bogus.0.clone())],
         )
         .unwrap();
         bogus

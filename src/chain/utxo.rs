@@ -27,17 +27,24 @@ pub struct TransactionInput {
     pub signature: Option<Vec<u8>>,
     pub value: u64,
     pub owner: Wallet,
-    pub index: Option<u32>,
+    pub index: usize,
     pub txid: Option<[u8; 32]>,
+}
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct UTXO {
+    pub value: u64,
+    pub owner: Wallet,
+    pub index: usize,
+    pub txid: [u8; 32],
 }
 
 impl TransactionInput {
-    pub fn new(value: u64, owner: Wallet) -> Self {
+    pub fn new(value: u64, owner: Wallet, index: usize) -> Self {
         Self {
             value,
             owner,
             signature: None,
-            index: None,
+            index,
             txid: None,
         }
     }
@@ -50,13 +57,13 @@ impl TransactionInput {
         vec.clone().into_iter().map(|utxo| utxo.value).sum()
     }
 
-    pub fn from_outputs(outputs: Vec<TransactionOutput>) -> Vec<Self> {
+    pub fn from_outputs(outputs: Vec<UTXO>) -> Vec<Self> {
         outputs.into_iter().map(Self::from).collect()
     }
 }
 
-impl From<TransactionOutput> for TransactionInput {
-    fn from(value: TransactionOutput) -> Self {
+impl From<UTXO> for TransactionInput {
+    fn from(value: UTXO) -> Self {
         Self {
             value: value.value,
             owner: value.owner,
@@ -119,92 +126,3 @@ impl Ord for TransactionInput {
 }
 
 // ----------------------- TRANSACTION INPUT -----------------------
-
-// ----------------------- TRANSACTION OUTPUT ----------------------
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TransactionOutput {
-    pub value: u64,
-    pub owner: Wallet,
-    pub index: Option<u32>,
-    pub txid: Option<[u8; 32]>,
-}
-
-impl TransactionOutput {
-    pub fn new(value: u64, owner: Wallet) -> Self {
-        Self {
-            value,
-            owner,
-            index: None,
-            txid: None,
-        }
-    }
-
-    pub fn sum<T>(vec: &T) -> u64
-    where
-        T: IntoIterator<Item = Self>,
-        T: Clone,
-    {
-        vec.clone().into_iter().map(|utxo| utxo.value).sum()
-    }
-}
-
-impl Display for TransactionOutput {
-    /// This does not serialize the txid
-    /// This will panic if index is None
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let owner_pem = self.owner.to_pem();
-        let owner = if let Ok(val) = String::from_utf8(owner_pem) {
-            val
-        } else {
-            panic!("Invalid UTF-8 when getting UTXO owner")
-        };
-
-        write!(
-            f,
-            "VALUE::{}::OWNER::{}::INDEX::{}",
-            self.value,
-            owner,
-            self.index.unwrap()
-        )
-    }
-}
-
-impl PartialEq for TransactionOutput {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value && self.owner == other.owner
-    }
-}
-impl PartialOrd for TransactionOutput {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Eq for TransactionOutput {}
-impl Ord for TransactionOutput {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value.cmp(&other.value)
-    }
-
-    fn max(self, other: Self) -> Self
-    where
-        Self: Sized,
-    {
-        if other.value < self.value {
-            self
-        } else {
-            other
-        }
-    }
-
-    fn min(self, other: Self) -> Self
-    where
-        Self: Sized,
-    {
-        if other.value < self.value {
-            other
-        } else {
-            self
-        }
-    }
-}

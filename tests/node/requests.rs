@@ -1,5 +1,5 @@
 use cleyto_coin::chain::transaction::Transaction;
-use cleyto_coin::chain::utxo::{TransactionInput, TransactionOutput};
+use cleyto_coin::chain::utxo::{TransactionInput, UTXO};
 use cleyto_coin::chain::wallet::Wallet;
 use cleyto_coin::{kill_node, run_server_thread};
 use std::thread;
@@ -20,8 +20,8 @@ fn thread_post(n: u16) {
         TransactionInput::new(2000, wallet1.clone()),
     ];
     let output_utxos = vec![
-        TransactionOutput::new(2500, wallet2.clone()),
-        TransactionOutput::new(500, wallet2.clone()),
+        UTXO::new(2500, wallet2.clone()),
+        UTXO::new(500, wallet2.clone()),
     ];
     let mut new_transaction: Transaction =
         Transaction::new(input_utxos, output_utxos).unwrap();

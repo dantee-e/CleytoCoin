@@ -1,5 +1,5 @@
 use cleyto_coin::chain::transaction::Transaction;
-use cleyto_coin::chain::utxo::{TransactionInput, TransactionOutput};
+use cleyto_coin::chain::utxo::{TransactionInput, UTXO};
 use cleyto_coin::chain::wallet::Wallet;
 use reqwest::Client;
 use std::error::Error;
@@ -23,8 +23,8 @@ async fn post_json() -> Result<(), Box<dyn Error>> {
         TransactionInput::new(2000, wallet_sender.clone()),
     ];
     let output_utxos = vec![
-        TransactionOutput::new(2500, wallet_receiver.clone()),
-        TransactionOutput::new(500, wallet_sender.clone()),
+        UTXO::new(2500, wallet_receiver.clone()),
+        UTXO::new(500, wallet_sender.clone()),
     ];
     let mut transaction: Transaction =
         Transaction::new(input_utxos, output_utxos).unwrap();

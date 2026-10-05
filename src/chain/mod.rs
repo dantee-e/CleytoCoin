@@ -9,9 +9,7 @@ mod wallet_pk;
 use block::Block;
 use serde::{Deserialize, Serialize};
 
-use crate::chain::{
-    block::BlockHeader, utxo::TransactionOutput, wallet::Wallet,
-};
+use crate::chain::{block::BlockHeader, utxo::UTXO, wallet::Wallet};
 
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Chain {
@@ -20,10 +18,7 @@ pub struct Chain {
 }
 
 impl Chain {
-    pub fn new(
-        first_receiver: Wallet,
-        utxo_original: Vec<TransactionOutput>,
-    ) -> Self {
+    pub fn new(first_receiver: Wallet, utxo_original: Vec<UTXO>) -> Self {
         let mut chain = Self {
             blocks: Vec::new(),
             wallets: Vec::new(),
@@ -33,7 +28,10 @@ impl Chain {
     }
 
     fn register_block_wallets(&mut self, block: &Block) {
-        println!("Registering block");
+        println!(
+            "Registering block. Len transactions is {}",
+            block.transactions.len()
+        );
         for tx in block.transactions.clone() {
             // <- exact accessor TBD
             // Outputs: this owner now has a new spendable UTXO.
@@ -70,7 +68,7 @@ impl Chain {
     pub fn create_genesis_block(
         &mut self,
         first_receiver: Wallet,
-        utxo_original: Vec<TransactionOutput>,
+        utxo_original: Vec<UTXO>,
     ) -> Block {
         let genesis = Block::genesis_block(first_receiver, utxo_original);
         self.add_block(genesis.clone());
@@ -102,7 +100,7 @@ impl Chain {
 pub mod testing {
     use super::Chain;
     use crate::chain::block::Block;
-    use crate::chain::utxo::{TransactionInput, TransactionOutput};
+    use crate::chain::utxo::{TransactionInput, UTXO};
     use crate::chain::{transaction::Transaction, wallet::Wallet};
 
     pub fn test_chain() -> Chain {
@@ -115,8 +113,8 @@ pub mod testing {
         // --- Block 1: wallet_1 splits 100000 evenly to itself and wallet_2 ---
         let utxos_1 = vec![TransactionInput::new(100000, wallet_1.0.clone())];
         let utxos_1_output = vec![
-            TransactionOutput::new(50000, wallet_1.0.clone()),
-            TransactionOutput::new(50000, wallet_2.0.clone()),
+            UTXO::new(50000, wallet_1.0.clone()),
+            UTXO::new(50000, wallet_2.0.clone()),
         ];
         let mut transaction_1 =
             Transaction::new(utxos_1, utxos_1_output).unwrap();
@@ -134,8 +132,7 @@ pub mod testing {
         //              wallet_2 sends 50000 split to wallet_3 and wallet_4 ---
         let utxos_2_input =
             vec![TransactionInput::new(50000, wallet_1.0.clone())];
-        let utxos_2_output =
-            vec![TransactionOutput::new(50000, wallet_3.0.clone())];
+        let utxos_2_output = vec![UTXO::new(50000, wallet_3.0.clone())];
         let mut transaction_2 =
             Transaction::new(utxos_2_input, utxos_2_output).unwrap();
 
@@ -146,8 +143,8 @@ pub mod testing {
 
         let utxos_3 = vec![TransactionInput::new(50000, wallet_2.0.clone())];
         let utxos_3_output = vec![
-            TransactionOutput::new(25000, wallet_3.0.clone()),
-            TransactionOutput::new(25000, wallet_4.0.clone()),
+            UTXO::new(25000, wallet_3.0.clone()),
+            UTXO::new(25000, wallet_4.0.clone()),
         ];
         let mut transaction_3 =
             Transaction::new(utxos_3, utxos_3_output).unwrap();
@@ -166,8 +163,7 @@ pub mod testing {
             TransactionInput::new(50000, wallet_3.0.clone()),
             TransactionInput::new(25000, wallet_3.0.clone()),
         ];
-        let utxos_4_output =
-            vec![TransactionOutput::new(75000, wallet_5.0.clone())];
+        let utxos_4_output = vec![UTXO::new(75000, wallet_5.0.clone())];
         let mut transaction_4 =
             Transaction::new(utxos_4, utxos_4_output).unwrap();
         wallet_3
@@ -177,8 +173,8 @@ pub mod testing {
 
         let utxos_5 = vec![TransactionInput::new(25000, wallet_4.0.clone())];
         let utxos_5_output = vec![
-            TransactionOutput::new(10000, wallet_1.0.clone()),
-            TransactionOutput::new(15000, wallet_5.0.clone()),
+            UTXO::new(10000, wallet_1.0.clone()),
+            UTXO::new(15000, wallet_5.0.clone()),
         ];
         let mut transaction_5 =
             Transaction::new(utxos_5, utxos_5_output).unwrap();
@@ -198,11 +194,11 @@ pub mod testing {
             TransactionInput::new(15000, wallet_5.0.clone()),
         ];
         let utxos_6_output = vec![
-            TransactionOutput::new(20000, wallet_1.0.clone()),
-            TransactionOutput::new(20000, wallet_2.0.clone()),
-            TransactionOutput::new(20000, wallet_3.0.clone()),
-            TransactionOutput::new(20000, wallet_4.0.clone()),
-            TransactionOutput::new(10000, wallet_5.0.clone()),
+            UTXO::new(20000, wallet_1.0.clone()),
+            UTXO::new(20000, wallet_2.0.clone()),
+            UTXO::new(20000, wallet_3.0.clone()),
+            UTXO::new(20000, wallet_4.0.clone()),
+            UTXO::new(10000, wallet_5.0.clone()),
         ];
         let mut transaction_6 =
             Transaction::new(utxos_6, utxos_6_output).unwrap();

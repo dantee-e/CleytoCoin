@@ -1,7 +1,7 @@
 use cleyto_coin::{
     chain::{
         transaction::Transaction,
-        utxo::TransactionOutput,
+        utxo::UTXO,
         wallet::{Wallet, WalletPK},
         Chain,
     },
@@ -14,7 +14,7 @@ fn create_multiple_nodes(n: usize) -> (Vec<Node>, Wallet, WalletPK) {
     let first_receiver = Wallet::new();
     let chain = Chain::new(
         first_receiver.0.clone(),
-        vec![TransactionOutput::new(1000, first_receiver.0.clone())],
+        vec![UTXO::new(1000, first_receiver.0.clone())],
     );
     (
         (0..n)
@@ -47,10 +47,7 @@ async fn use_multiple_nodes() {
 
     let mut transaction = Transaction::new(
         input_utxos,
-        vec![
-            TransactionOutput::new(200, wallet1.0.clone()),
-            TransactionOutput::new(200, wallet2.0),
-        ],
+        vec![UTXO::new(200, wallet1.0.clone()), UTXO::new(200, wallet2.0)],
     )
     .unwrap();
 

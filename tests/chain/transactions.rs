@@ -1,5 +1,5 @@
 use cleyto_coin::chain::transaction::Transaction;
-use cleyto_coin::chain::utxo::{TransactionInput, TransactionOutput};
+use cleyto_coin::chain::utxo::{TransactionInput, UTXO};
 use cleyto_coin::chain::wallet::Wallet;
 
 #[test]
@@ -12,8 +12,8 @@ fn create_transaction() {
         TransactionInput::new(2000, wallet_sender.clone()),
     ];
     let output_utxos = vec![
-        TransactionOutput::new(2500, wallet_receiver.clone()),
-        TransactionOutput::new(500, wallet_receiver.clone()),
+        UTXO::new(2500, wallet_receiver.clone()),
+        UTXO::new(500, wallet_receiver.clone()),
     ];
     let mut transaction = Transaction::new(input_utxos, output_utxos).unwrap();
 
@@ -43,8 +43,8 @@ fn test_transaction_info_creation() {
         TransactionInput::new(2000, wallet_sender.clone()),
     ];
     let output_utxos = vec![
-        TransactionOutput::new(2500, wallet_receiver.clone()),
-        TransactionOutput::new(500, wallet_receiver.clone()),
+        UTXO::new(2500, wallet_receiver.clone()),
+        UTXO::new(500, wallet_receiver.clone()),
     ];
     let transaction_info: Transaction =
         Transaction::new(input_utxos, output_utxos).unwrap();
@@ -63,8 +63,8 @@ fn sign_and_verify_transaction_info() {
         TransactionInput::new(2000, wallet_sender.clone()),
     ];
     let output_utxos = vec![
-        TransactionOutput::new(2500, wallet_receiver.clone()),
-        TransactionOutput::new(500, wallet_receiver.clone()),
+        UTXO::new(2500, wallet_receiver.clone()),
+        UTXO::new(500, wallet_receiver.clone()),
     ];
     let mut transaction_info: Transaction =
         Transaction::new(input_utxos, output_utxos).unwrap();
@@ -88,8 +88,8 @@ fn serialize_and_deserialize_transaction() {
         TransactionInput::new(2000, wallet.clone()),
     ];
     let output_utxos = vec![
-        TransactionOutput::new(2500, mallet.clone()),
-        TransactionOutput::new(500, mallet.clone()),
+        UTXO::new(2500, mallet.clone()),
+        UTXO::new(500, mallet.clone()),
     ];
     let mut transaction = Transaction::new(input_utxos, output_utxos).unwrap();
 

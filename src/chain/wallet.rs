@@ -1,6 +1,6 @@
 use super::transaction::Transaction;
 use crate::chain::ordered_vector::OrderedVec;
-use crate::chain::utxo::{TransactionInput, TransactionOutput};
+use crate::chain::utxo::{TransactionInput, UTXO};
 use crate::configs::ConfigPaths;
 use crate::error_handling::{CleytoResult, TransactionError};
 
@@ -87,7 +87,7 @@ impl From<String> for Wallet {
             .expect("Error converting from RSA to PKey<Public>");
         Self {
             public_key,
-            available_utxos: None,
+            available_utxos: OrderedVec::new(),
         }
     }
 }
@@ -95,7 +95,7 @@ impl From<PKey<Public>> for Wallet {
     fn from(public_key: PKey<Public>) -> Self {
         Self {
             public_key,
-            available_utxos: None,
+            available_utxos: OrderedVec::new(),
         }
     }
 }
@@ -109,7 +109,7 @@ pub struct Wallet {
         deserialize_with = "deserialize_public_key"
     )]
     pub(crate) public_key: PKey<Public>,
-    pub(crate) available_utxos: Option<OrderedVec<TransactionOutput>>,
+    pub(crate) available_utxos: OrderedVec<UTXO>,
 }
 
 const MAX_UTXO_SEARCH_DEPTH: usize = 100;
@@ -120,7 +120,7 @@ const MAX_ITERATIONS_NON_EXACT_COIN_SELECTION: u64 = 10_000;
 // Helper for the coin selection algorithms
 #[derive(Clone)]
 struct UtxoEstimate {
-    utxo: TransactionOutput,
+    utxo: UTXO,
     effective_value: u64,
     weight: u64,
 }
@@ -146,7 +146,7 @@ impl Wallet {
         (
             Wallet {
                 public_key,
-                available_utxos: None,
+                available_utxos: OrderedVec::new(),
             },
             WalletPK { private_key },
         )
@@ -188,19 +188,14 @@ impl Wallet {
 
     /// Rough fee estimate per UTXO – replace with a real estimator later.
     // TODO
-    fn estimate_fee_per_utxo(_utxo: &TransactionOutput) -> u64 {
+    fn estimate_fee_per_utxo(_utxo: &UTXO) -> u64 {
         100
     }
 
     /// Insert a batch of new UTXOs, keeping the internal ordering intact.
-    pub fn add_utxos(&mut self, new_vec: Vec<TransactionOutput>) {
-        match &mut self.available_utxos {
-            Some(ord_vec) => {
-                for utxo in new_vec {
-                    ord_vec.insert(utxo);
-                }
-            }
-            None => self.available_utxos = Some(OrderedVec::from(new_vec)),
+    pub fn add_utxos(&mut self, new_vec: Vec<UTXO>) {
+        for utxo in new_vec {
+            self.available_utxos.insert(utxo);
         }
     }
 
@@ -234,14 +229,10 @@ impl Wallet {
         &self,
         amount: u64,
     ) -> Result<Vec<TransactionInput>, WalletError> {
-        let utxos = self
-            .available_utxos
-            .as_ref()
-            .ok_or(WalletError::InsufficientFunds)?
-            .clone();
+        let utxos = self.available_utxos.clone();
 
         // If the total balance is insufficient stop
-        if TransactionOutput::sum(&utxos) < amount {
+        if UTXO::sum(&utxos) < amount {
             return Err(WalletError::InsufficientFunds);
         }
 
@@ -341,7 +332,7 @@ impl Wallet {
         dust_threshold: u64,
         max_reps: usize,
         total_sum: u64,
-    ) -> (Vec<TransactionOutput>, u64) {
+    ) -> (Vec<UTXO>, u64) {
         // Transform each UTXO into an enriched struct that carries an estimated
         // “effective value” (value minus fee) and its weight.
 
@@ -444,7 +435,7 @@ impl Wallet {
 
         // Strip the auxiliary data and return plain UTXOs.
         let selected = best_set.into_iter().map(|e| e.utxo).collect::<Vec<_>>();
-        let total_selected = TransactionOutput::sum(&selected);
+        let total_selected = UTXO::sum(&selected);
         (selected, total_selected)
     }
 
@@ -466,9 +457,9 @@ impl Wallet {
     }
 
     fn dantes_crazy_algorithm_entrypoint(
-        slice: &[TransactionOutput],
+        slice: &[UTXO],
         target: u64,
-    ) -> Vec<TransactionOutput> {
+    ) -> Vec<UTXO> {
         let mut solution: Vec<UtxoEstimate> = Vec::new();
         let mut solution_waste = u64::MAX;
 
@@ -596,13 +587,11 @@ impl Wallet {
         );
     }
     pub fn remove_utxo(&mut self, spent: &TransactionInput) {
-        if let Some(ord_vec) = &mut self.available_utxos {
-            ord_vec.retain(|u| {
-                u.value != spent.value
-                    || u.owner != spent.owner
-                    || u.index != spent.index
-            });
-        }
+        self.available_utxos.retain(|u| {
+            u.value != spent.value
+                || u.owner != spent.owner
+                || u.index != spent.index
+        });
     }
 }
 

@@ -1,4 +1,5 @@
 use super::transaction::Transaction;
+use crate::chain::ordered_vector::OrderedVec;
 use crate::chain::utxo::TransactionInput;
 use crate::chain::wallet::Wallet;
 use crate::configs::ConfigPaths;
@@ -123,7 +124,7 @@ impl WalletPK {
 
         Wallet {
             public_key,
-            available_utxos: None,
+            available_utxos: OrderedVec::new(),
         }
     }
 }

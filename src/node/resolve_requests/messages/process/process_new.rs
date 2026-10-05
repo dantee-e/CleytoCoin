@@ -2,7 +2,7 @@ use crate::{
     chain::{
         block::Block,
         transaction::Transaction,
-        utxo::{TransactionInput, TransactionOutput},
+        utxo::{TransactionInput, UTXO},
         Chain,
     },
     error_handling::{
@@ -108,12 +108,6 @@ pub fn process_new_transaction(
         seen.push(key);
 
         println!("Wallets length is {}", wallets.len());
-        for wallet in wallets.iter() {
-            println!(
-                "Wallet is {:#?}",
-                wallet.public_key.public_key_to_pem().unwrap()
-            );
-        }
 
         let wallet =
             wallets.iter().find(|w| **w == input.owner).ok_or_else(|| {
@@ -122,13 +116,15 @@ pub fn process_new_transaction(
                 )))
             })?;
 
-        let utxos = wallet.available_utxos.as_ref().ok_or_else(|| {
-            HTTPResponseError::InvalidBody(Some(String::from(
-                "Wallet has no available UTXOs",
-            )))
-        })?;
+        println!(
+            "available_utxos len is {}, utxo is {:#?}",
+            wallet.available_utxos.iter().len(),
+            wallet.available_utxos.get(0)
+        );
+        println!("Searching for utxo {:#?}", input.txid);
 
-        let utxo = utxos
+        let utxo = wallet
+            .available_utxos
             .iter()
             .find(|u| u.txid == input.txid && u.index == input.index)
             .ok_or_else(|| {

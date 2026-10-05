@@ -1,7 +1,7 @@
 use super::wallet::Wallet;
 use crate::chain::ordered_vector::OrderedVec;
 use crate::chain::utxo::TransactionInput;
-use crate::chain::utxo::TransactionOutput;
+use crate::chain::utxo::UTXO;
 use crate::error_handling::CleytoResult;
 use crate::error_handling::TransactionDeserializeError;
 use crate::error_handling::TransactionError;
@@ -16,57 +16,43 @@ use std::fmt::Display;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Transaction {
     pub inputs: Vec<TransactionInput>,
-    pub outputs: Vec<TransactionOutput>,
+    pub outputs: Vec<UTXO>,
     pub date: DateTime<Utc>,
     pub txid: [u8; 32],
 }
 
 impl Transaction {
-    /// Use this function to sign the transaction output + the individual input utxo
-    pub fn get_ordered_bytes_for_signing(
-        &self,
-        input: &TransactionInput,
-    ) -> Vec<u8> {
-        // Length-prefix each piece so different transactions can never
-        // produce the same byte stream by shifting boundaries.
+    pub fn get_ordered_bytes_for_signing(&self) -> Vec<u8> {
         fn push_field(bytes: &mut Vec<u8>, field: &[u8]) {
             bytes.extend((field.len() as u64).to_be_bytes());
             bytes.extend(field);
         }
 
-        let mut bytes: Vec<u8> = Vec::new();
+        let mut bytes = Vec::new();
+        push_field(&mut bytes, b"CLEYTOCOIN_TX_V1");
 
-        push_field(&mut bytes, input.to_string().as_bytes());
-
-        let mut all_inputs: Vec<String> =
-            self.inputs.iter().map(|i| i.to_string()).collect();
-        all_inputs.sort();
-
-        bytes.extend((all_inputs.len() as u64).to_be_bytes());
-        for s in &all_inputs {
-            push_field(&mut bytes, s.as_bytes());
+        bytes.extend((self.inputs.len() as u64).to_be_bytes());
+        for input in &self.inputs {
+            bytes.extend(input.txid.unwrap()); // fixed 32 bytes
+            bytes.extend(input.index.to_be_bytes());
         }
 
-        // 3. All outputs, in your existing deterministic order
-        let outputs: Vec<String> = OrderedVec::from(self.outputs.clone())
-            .into_iter()
-            .map(|output| output.to_string())
-            .collect();
-
-        bytes.extend((outputs.len() as u64).to_be_bytes());
-        for s in &outputs {
-            push_field(&mut bytes, s.as_bytes());
+        bytes.extend((self.outputs.len() as u64).to_be_bytes());
+        for out in &self.outputs {
+            bytes.extend(out.value.to_be_bytes());
+            push_field(&mut bytes, &out.owner.to_pem());
         }
 
+        // Phase 5: bytes.push(self.deposit as u8);
         bytes
     }
 
     pub fn new(
         inputs: Vec<TransactionInput>,
-        mut outputs: Vec<TransactionOutput>,
+        mut outputs: Vec<UTXO>,
     ) -> CleytoResult<Self> {
         let input_sum = TransactionInput::sum(&inputs);
-        let output_sum = TransactionOutput::sum(&outputs);
+        let output_sum = UTXO::sum(&outputs);
 
         let change: i64 = input_sum as i64 - output_sum as i64;
 
@@ -85,7 +71,7 @@ impl Transaction {
             date: Utc::now(),
         };
 
-        let to_hash = transaction.to_string();
+        let to_hash = transaction.get_ordered_bytes_for_signing();
         let mut hasher: Sha256 = Sha256::new();
         hasher.update(to_hash.as_bytes());
         transaction.txid = hasher.finish().to_owned();
@@ -120,7 +106,7 @@ impl Transaction {
     ) -> Result<(), TransactionDeserializeError> {
         let input_sum = TransactionInput::sum(&tx.inputs);
         println!("Input sum is {input_sum}");
-        let output_sum = TransactionOutput::sum(&tx.outputs);
+        let output_sum = UTXO::sum(&tx.outputs);
         println!("Output sum is {output_sum}");
         let change = input_sum as i64 - output_sum as i64;
 
@@ -146,7 +132,7 @@ impl Default for Transaction {
         let value: u64 = rand::random();
 
         let input = TransactionInput::new(value, sender.clone());
-        let output = TransactionOutput::new(value, receiver.clone());
+        let output = UTXO::new(value, receiver.clone());
 
         let mut transaction_info =
             Transaction::new(vec![input], vec![output]).unwrap();
