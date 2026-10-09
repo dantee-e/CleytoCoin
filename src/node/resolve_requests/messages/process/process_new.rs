@@ -1,10 +1,5 @@
 use crate::{
-    chain::{
-        block::Block,
-        transaction::Transaction,
-        utxo::OutPoint,
-        Chain,
-    },
+    chain::{block::Block, transaction::Transaction, utxo::OutPoint, Chain},
     error_handling::{CleytonError, TransactionError},
     node::{
         resolve_requests::{
@@ -22,6 +17,17 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+fn chain_conflict(chain: &Chain, challenging_block: Block) -> HTTPResult {
+    let my_last_block = chain.blocks.last().expect("Node has an empty chain");
+    if my_last_block.height() > challenging_block.height() {
+        return Ok(HTTPResponse::OK(None));
+    }
+
+    // if competing chain is longer
+
+    Ok(HTTPResponse::OK(None))
+}
+
 pub fn process_new_block(
     block: Block,
     chain: &mut Chain,
@@ -33,13 +39,13 @@ pub fn process_new_block(
     if chain.blocks.iter().any(|b| b.hash() == block.hash()) {
         return Ok(HTTPResponse::OK(None));
     }
+
+    // chain conflicst are handled when receiving block headers
     if block.previous_hash() == chain.get_last_hash() {
-        notify_new_block(&block, connected_nodes, source);
         chain.add_block(block);
-        Ok(HTTPResponse::OK(None))
-    } else {
-        unimplemented!("Chain conflict!");
     }
+
+    Ok(HTTPResponse::OK(None))
 }
 
 fn validation_error_to_http(error: CleytonError) -> HTTPResponseError {

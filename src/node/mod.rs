@@ -10,6 +10,7 @@ mod utils;
 
 pub use resolve_requests::messages::{GetDataMessage, Message};
 
+use crate::chain::block::Block;
 use crate::chain::{transaction::Transaction, Chain};
 use crate::configs::ConfigPaths;
 use crate::node::logger::Logger;
@@ -45,9 +46,44 @@ pub struct ConnectedNodeInfo {
 #[derive(Serialize, Deserialize)]
 pub struct NodeState {
     pub status: bool,
-    pub chain: Chain,
-    pub transactions_pool: Vec<Transaction>,
-    pub connected_nodes: HashSet<ConnectedNodeInfo>,
+    chain: Chain,
+    transactions_pool: Vec<Transaction>,
+    connected_nodes: HashSet<ConnectedNodeInfo>,
+}
+impl NodeState {
+    pub fn new(
+        status: bool,
+        chain: Chain,
+        transactions_pool: Vec<Transaction>,
+        connected_nodes: HashSet<ConnectedNodeInfo>,
+    ) -> Self {
+        Self {
+            status,
+            chain,
+            transactions_pool,
+            connected_nodes,
+        }
+    }
+
+    fn on_update(&self) {
+        // TODO update NodeState
+    }
+
+    pub fn push_to_transaction_pool(&mut self, transaction: Transaction) {
+        self.transactions_pool.push(transaction);
+        self.on_update();
+    }
+    pub fn push_to_chain(&mut self, block: Block) {
+        self.chain.add_block(block);
+        self.on_update();
+    }
+
+    pub fn chain(&self) -> &Chain {
+        &self.chain
+    }
+    pub fn transactions_pool(&self) -> &Vec<Transaction> {
+        &self.transactions_pool
+    }
 }
 impl Default for NodeState {
     fn default() -> Self {

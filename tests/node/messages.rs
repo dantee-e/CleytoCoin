@@ -11,12 +11,12 @@ use cleyto_coin::node::{Message, NodeState};
 use crate::mock_stream::request;
 
 fn state_with(chain: Chain) -> Arc<Mutex<NodeState>> {
-    Arc::new(Mutex::new(NodeState {
-        status: true,
+    Arc::new(Mutex::new(NodeState::new(
+        true,
         chain,
-        transactions_pool: Vec::new(),
-        connected_nodes: HashSet::new(),
-    }))
+        Vec::new(),
+        HashSet::new(),
+    )))
 }
 
 /// A node whose genesis gives 1000 to `sender`, and the next block for that
@@ -37,7 +37,7 @@ fn node_and_next_block() -> (Arc<Mutex<NodeState>>, Block, Wallet, Wallet) {
 
     // Built on a copy, so the node's chain doesn't have the block yet
     let mut builder = chain.clone();
-    let block = Block::new(&mut builder, vec![transaction]);
+    let block = Block::new(&mut builder, vec![transaction], Vec::new());
 
     (state_with(chain), block, sender.0, receiver)
 }
@@ -47,7 +47,7 @@ fn balance(state: &Arc<Mutex<NodeState>>, wallet: &Wallet) -> u64 {
         &state
             .lock()
             .unwrap()
-            .chain
+            .chain()
             .utxos_owned_by(&wallet.to_public_key()),
     )
 }
@@ -57,14 +57,13 @@ async fn send_new_block() {
     let (state, block, sender, receiver) = node_and_next_block();
     let body = serde_json::to_string(&Message::Block(block.clone())).unwrap();
 
-    let result =
-        request("POST", "/messages", Some(&body), state.clone()).await;
+    let result = request("POST", "/messages", Some(&body), state.clone()).await;
     assert!(result.is_ok(), "expected Ok, got {:?}", result);
 
     {
         let state = state.lock().unwrap();
-        assert_eq!(state.chain.blocks.len(), 2);
-        assert_eq!(state.chain.get_last_hash(), block.hash());
+        assert_eq!(state.chain().blocks.len(), 2);
+        assert_eq!(state.chain().get_last_hash(), block.hash());
     }
 
     // The block's transaction was applied to the UTXO set
@@ -84,7 +83,7 @@ async fn send_same_block_twice() {
     }
 
     // Added, and its transaction applied, only once
-    assert_eq!(state.lock().unwrap().chain.blocks.len(), 2);
+    assert_eq!(state.lock().unwrap().chain().blocks.len(), 2);
     assert_eq!(balance(&state, &receiver), 600);
     assert_eq!(balance(&state, &sender), 400);
 }

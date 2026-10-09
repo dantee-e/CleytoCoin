@@ -12,20 +12,23 @@ pub struct Block {
     version: u8,
     previous_hash: String,
     pub(crate) transactions: Vec<Transaction>,
-    index: u64,
+    height: u64,
     timestamp: DateTime<Utc>,
     hash: String,
     merkle_root: [u8; 32],
     nonce: u64,
+    miner_key: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct BlockHeader {
     version: u8,
     previous_hash: String,
+    height: u64,
     timestamp: DateTime<Utc>,
     merkle_root: [u8; 32],
     nonce: u64,
+    miner_key: Vec<u8>,
 }
 
 impl Block {
@@ -33,17 +36,19 @@ impl Block {
         self.hash.clone()
     }
 
-    pub fn index(&self) -> u64 {
-        self.index
+    pub fn height(&self) -> u64 {
+        self.height
     }
 
     pub fn to_header(&self) -> BlockHeader {
         BlockHeader {
             version: self.version,
             previous_hash: self.previous_hash.clone(),
+            height: self.height,
             timestamp: self.timestamp,
             merkle_root: self.merkle_root,
             nonce: self.nonce,
+            miner_key: self.miner_key.clone(),
         }
     }
 
@@ -116,14 +121,6 @@ impl Block {
     }
 
     pub fn calculate_hash(&self) -> String {
-        //This here should be replaced by the calculation of the merkle tree
-        // let transactions_string = self
-        //     .transactions
-        //     .iter()
-        //     .map(|t| t.to_string()) // Calls the `to_string()` method of `Transaction`
-        //     .collect::<Vec<String>>() // Collects into a Vec<String>
-        //     .join("::END_OF_TRANSACTION::BEGIN_OF_TRANSACTION::"); // Joins all elements with "; " as separator
-
         let merkle_root = Self::calculate_merkle_root(&self.transactions);
 
         let serialized = serde_json::to_string(&(
@@ -134,7 +131,7 @@ impl Block {
             merkle_root,
             "::END_OF_TRANSACTION",
             "::END_TRANSACTIONS::BEGIN_INDEX::",
-            &self.index,
+            &self.height,
             "::END_INDEX::BEGIN_TIMESTAMP::",
             &self.timestamp.to_string(),
             "::END_TIMESTAMP::BEGIN_NONCE::",
@@ -152,7 +149,11 @@ impl Block {
         hex::encode(result) // Converts bytes to a hex string
     }
 
-    pub fn new(chain: &mut Chain, transactions: Vec<Transaction>) -> Block {
+    pub fn new(
+        chain: &mut Chain,
+        transactions: Vec<Transaction>,
+        miner_key: Vec<u8>,
+    ) -> Block {
         let previous_hash = chain.get_last_hash();
         let index = chain.get_last_index() + 1;
         let timestamp = Utc::now();
@@ -162,11 +163,12 @@ impl Block {
             version: 1,
             previous_hash,
             transactions,
-            index,
+            height: index,
             timestamp,
             hash: String::new(),
             merkle_root,
             nonce: 0, // temporary so that we can calculate hash
+            miner_key,
         };
 
         block.hash = block.calculate_hash();
@@ -183,13 +185,14 @@ impl Block {
             version: 1,
             previous_hash: String::from("Foguete nao da re"),
             transactions: transactions_vec,
-            index: 1,
+            height: 1,
             timestamp: Utc::now(),
             hash: String::from(
                 "The_Times_03_Jan_2009_Chancellor_on_brink_of_second_bailout_for_banks",
             ),
             merkle_root,
             nonce: 0,
+            miner_key: Vec::new(),
         }
     }
 
@@ -221,11 +224,12 @@ impl Block {
             version: 1,
             previous_hash,
             transactions,
-            index,
+            height: index,
             timestamp,
             hash: String::new(),
             merkle_root,
             nonce: 0, // temporary so that we can calculate hash
+            miner_key: Vec::new(),
         };
 
         block.hash = block.calculate_hash();

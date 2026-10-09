@@ -86,8 +86,7 @@ pub fn messages(data: &POSTData, state: Arc<Mutex<NodeState>>) -> HTTPResult {
             )
         }
         Message::NewNode(new_node_message) => {
-            let connected_nodes = &mut state.lock().unwrap().connected_nodes;
-            process_new_node(new_node_message, connected_nodes)
+            process_new_node(new_node_message, state)
         }
         Message::KeyRefresh => todo!(),
         Message::CheckTransaction(transaction_header) => {

@@ -27,7 +27,7 @@ fn serialize_and_deserialize_node() {
         .state
         .lock()
         .unwrap()
-        .chain
+        .chain()
         .blocks
         .iter()
         .map(|block| block.hash())

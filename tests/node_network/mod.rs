@@ -12,8 +12,7 @@ use crate::mock_stream::request;
 
 fn create_multiple_nodes(n: usize) -> (Vec<Node>, Wallet, WalletPK) {
     let (mut first_receiver, first_receiver_pk) = Wallet::new();
-    let chain =
-        Chain::new(vec![TransactionOutput::new(1000, &first_receiver)]);
+    let chain = Chain::new(vec![TransactionOutput::new(1000, &first_receiver)]);
     chain.load_wallet_utxos(&mut first_receiver);
     (
         (0..n)
@@ -68,7 +67,7 @@ async fn use_multiple_nodes() {
         println!("Result is {str}");
     }
 
-    assert_eq!(state1.lock().unwrap().transactions_pool.len(), 1);
+    assert_eq!(state1.lock().unwrap().transactions_pool().len(), 1);
     // TODO: once nodes are connected to each other, check that the
     // transaction reached the other nodes' pools too
 }

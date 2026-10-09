@@ -21,8 +21,7 @@ mod handle_connection_tests {
 
     /// A node state whose genesis gives 1000 to a sender, and a validly
     /// signed transaction sending those 1000 to a receiver.
-    fn funded_state_and_transaction() -> (Arc<Mutex<NodeState>>, Transaction)
-    {
+    fn funded_state_and_transaction() -> (Arc<Mutex<NodeState>>, Transaction) {
         let (state, transaction, _) = funded_state_and_signer(1000);
         (state, transaction)
     }
@@ -53,12 +52,12 @@ mod handle_connection_tests {
             transaction
         };
 
-        let state = Arc::new(Mutex::new(NodeState {
-            status: true,
+        let state = Arc::new(Mutex::new(NodeState::new(
+            true,
             chain,
-            transactions_pool: Vec::new(),
-            connected_nodes: HashSet::new(),
-        }));
+            Vec::new(),
+            HashSet::new(),
+        )));
 
         (state, spend(amount), spend)
     }
@@ -74,9 +73,9 @@ mod handle_connection_tests {
                 message.contains(expected),
                 "expected error containing {expected:?}, got {message:?}"
             ),
-            other => panic!(
-                "expected error containing {expected:?}, got {other:?}"
-            ),
+            other => {
+                panic!("expected error containing {expected:?}, got {other:?}")
+            }
         }
     }
 
@@ -121,7 +120,7 @@ mod handle_connection_tests {
         let result =
             request("POST", "/messages", Some(&body), state.clone()).await;
         assert!(result.is_ok(), "expected Ok, got {:?}", result);
-        assert_eq!(state.lock().unwrap().transactions_pool.len(), 1);
+        assert_eq!(state.lock().unwrap().transactions_pool().len(), 1);
     }
 
     #[tokio::test]
@@ -150,8 +149,11 @@ mod handle_connection_tests {
             serde_json::to_string(&Message::Transaction(double_spend)).unwrap();
         let result =
             request("POST", "/messages", Some(&body), state.clone()).await;
-        assert_err_contains(&result, "already spent by a transaction in the pool");
-        assert_eq!(state.lock().unwrap().transactions_pool.len(), 1);
+        assert_err_contains(
+            &result,
+            "already spent by a transaction in the pool",
+        );
+        assert_eq!(state.lock().unwrap().transactions_pool().len(), 1);
     }
 
     #[ignore = "KeyRefresh not implemented"]
@@ -260,6 +262,6 @@ mod handle_connection_tests {
             request("POST", "/messages", Some(&body), state.clone()).await;
 
         assert_err_contains(&result, "signature did not match");
-        assert!(state.lock().unwrap().transactions_pool.is_empty());
+        assert!(state.lock().unwrap().transactions_pool().is_empty());
     }
 }

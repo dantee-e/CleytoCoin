@@ -31,10 +31,13 @@ fn create_block_and_add_chain() {
 
     chain.validate_transaction(&transaction).unwrap();
 
-    let block = Block::new(&mut chain, vec![transaction]);
+    let block = Block::new(&mut chain, vec![transaction], Vec::new());
 
     chain.add_block(block);
 
     assert!(chain.utxos_owned_by(&wallet1.to_public_key()).is_empty());
-    assert_eq!(UTXO::sum(&chain.utxos_owned_by(&wallet2.to_public_key())), 3000);
+    assert_eq!(
+        UTXO::sum(&chain.utxos_owned_by(&wallet2.to_public_key())),
+        3000
+    );
 }

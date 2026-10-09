@@ -81,7 +81,7 @@ impl Chain {
         self.blocks
             .last()
             .expect("Chain was created without genesis_block")
-            .index()
+            .height()
     }
 
     pub fn find_block_from_header(
@@ -142,7 +142,7 @@ pub mod testing {
                 TransactionOutput::new(50000, &wallet_2.0),
             ],
         );
-        let block_1 = Block::new(&mut chain, vec![transaction_1]);
+        let block_1 = Block::new(&mut chain, vec![transaction_1], Vec::new());
         chain.add_block(block_1);
 
         // --- Block 2: wallet_1 sends 50000 to wallet_3,
@@ -160,8 +160,11 @@ pub mod testing {
                 TransactionOutput::new(25000, &wallet_4.0),
             ],
         );
-        let block_2 =
-            Block::new(&mut chain, vec![transaction_2, transaction_3]);
+        let block_2 = Block::new(
+            &mut chain,
+            vec![transaction_2, transaction_3],
+            Vec::new(),
+        );
         chain.add_block(block_2);
 
         // --- Block 3: wallet_3 consolidates its 75000 and sends it all to wallet_5,
@@ -179,8 +182,11 @@ pub mod testing {
                 TransactionOutput::new(15000, &wallet_5.0),
             ],
         );
-        let block_3 =
-            Block::new(&mut chain, vec![transaction_4, transaction_5]);
+        let block_3 = Block::new(
+            &mut chain,
+            vec![transaction_4, transaction_5],
+            Vec::new(),
+        );
         chain.add_block(block_3);
 
         // --- Block 4: wallet_5 distributes its 90000 back to everyone ---
@@ -195,7 +201,7 @@ pub mod testing {
                 TransactionOutput::new(10000, &wallet_5.0),
             ],
         );
-        let block_4 = Block::new(&mut chain, vec![transaction_6]);
+        let block_4 = Block::new(&mut chain, vec![transaction_6], Vec::new());
         chain.add_block(block_4);
 
         chain
